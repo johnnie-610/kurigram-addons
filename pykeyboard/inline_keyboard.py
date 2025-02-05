@@ -20,23 +20,23 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
         "last": "{} »",
     }
 
-    _LOCALES: dict[str, str] = {
-        "be_BY": f"{FLAG_BELARUS} Беларуская",  # Belarusian - Belarus
-        "de_DE": f"{FLAG_GERMANY} Deutsch",  # German - Germany
-        "zh_CN": f"{FLAG_CHINA} 中文",  # Chinese - China
-        # English - United States
-        "en_US": f"{FLAG_UNITED_KINGDOM}  English",
-        "fr_FR": f"{FLAG_FRANCE} Français",  # French - France
-        # Indonesian - Indonesia
-        "id_ID": f"{FLAG_INDONESIA} Bahasa Indonesia",
-        "it_IT": f"{FLAG_ITALY} Italiano",  # Italian - Italy
-        "ko_KR": f"{FLAG_SOUTH_KOREA} 한국어",  # Korean - Korea
-        "tr_TR": f"{FLAG_TURKEY} Türkçe",  # Turkish - Turkey
-        "ru_RU": f"{FLAG_RUSSIA} Русский",  # Russian - Russia
-        "es_ES": f"{FLAG_SPAIN} Español",  # Spanish - Spain
-        "uk_UA": f"{FLAG_UKRAINE} Українська",  # Ukrainian - Ukraine
-        "uz_UZ": f"{FLAG_UZBEKISTAN} Oʻzbekcha",  # Uzbek - Uzbekistan
-    }
+    @staticmethod
+    def _get_locales() -> dict[str, str]:
+        return {
+            "be_BY": f"{FLAG_BELARUS} Беларуская",  # Belarusian - Belarus
+            "de_DE": f"{FLAG_GERMANY} Deutsch",  # German - Germany
+            "zh_CN": f"{FLAG_CHINA} 中文",  # Chinese - China
+            "en_US": f"{FLAG_UNITED_KINGDOM}  English",  # English - United States
+            "fr_FR": f"{FLAG_FRANCE} Français",  # French - France
+            "id_ID": f"{FLAG_INDONESIA} Bahasa Indonesia",  # Indonesian - Indonesia
+            "it_IT": f"{FLAG_ITALY} Italiano",  # Italian - Italy
+            "ko_KR": f"{FLAG_SOUTH_KOREA} 한국어",  # Korean - Korea
+            "tr_TR": f"{FLAG_TURKEY} Türkçe",  # Turkish - Turkey
+            "ru_RU": f"{FLAG_RUSSIA} Русский",  # Russian - Russia
+            "es_ES": f"{FLAG_SPAIN} Español",  # Spanish - Spain
+            "uk_UA": f"{FLAG_UKRAINE} Українська",  # Ukrainian - Ukraine
+            "uz_UZ": f"{FLAG_UZBEKISTAN} Oʻzbekcha",  # Uzbek - Uzbekistan
+        }
 
     def __post_init__(self):
         super().__init__(inline_keyboard=self.keyboard)
@@ -175,11 +175,11 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
 
         buttons = [
             InlineButton(
-                text=self._LOCALES.get(locale, "Invalid locale"),
+                text=self._get_locales().get(locale, "Invalid locale"),
                 callback_data=callback_pattern.format(locale=locale),
             )
             for locale in locales
-            if locale in self._LOCALES
+            if locale in self._get_locales()
         ]
 
         self.keyboard = [
