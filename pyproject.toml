@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kurigram-addons"
-version = "0.1.1"
+version = "0.1.2"
 description = "This package brings together several addons to kurigram including pykeyboard and FSM"
 authors = ["Johnnie <99084912+johnnie-610@users.noreply.github.com>"]
 license = "MIT"
@@ -10,8 +10,6 @@ packages = [{include = "pykeyboard"}, {include = "pyrogram_patch"}]
 [tool.poetry.dependencies]
 python = "^3.8"
 kurigram = "^2.1.35"
-
-
 
 [build-system]
 requires = ["poetry-core"]
