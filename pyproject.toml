@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kurigram-addons"
-version = "0.1.2"
+version = "0.1.4"
 description = "This package brings together several addons to kurigram including pykeyboard and FSM"
 authors = ["Johnnie <99084912+johnnie-610@users.noreply.github.com>"]
 license = "MIT"

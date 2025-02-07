@@ -50,6 +50,34 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
         """Create cached button with optimized parameters."""
         return InlineButton(text=text, callback_data=callback_data)
 
+    def paginate(
+        self, count_pages: int, current_page: int, callback_pattern: str
+    ) -> None:
+        """Optimized pagination with better edge case handling.
+
+        Args:
+            count_pages (int): Total number of pages.
+            current_page (int): The page number currently being viewed.
+            callback_pattern (str): The pattern used for callback data.
+
+        Example:
+            >>> keyboard = InlineKeyboard()
+            >>> keyboard.paginate(10, 1, 'page_{number}')
+            >>> print(keyboard.keyboard)
+            [[InlineKeyboardButton(text='· 1 ·', callback_data='page_1'), ...]]
+
+        """
+        self.count_pages = max(1, count_pages)
+        self.current_page = max(1, min(current_page, self.count_pages))
+        self.callback_pattern = callback_pattern
+
+        if self.count_pages <= 5:
+            pagination = self._build_small_pagination()
+        else:
+            pagination = self._build_large_pagination()
+
+        self.keyboard.append(pagination)
+
     def _build_small_pagination(self) -> list[InlineKeyboardButton]:
         return [
             self._create_button(
@@ -62,6 +90,13 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
             )
             for i in range(1, self.count_pages + 1)
         ]
+
+    def _build_large_pagination(self) -> list[InlineKeyboardButton]:
+        if self.current_page <= 3:
+            return self._build_left_pagination()
+        elif self.current_page > self.count_pages - 3:
+            return self._build_right_pagination()
+        return self._build_middle_pagination()
 
     def _build_left_pagination(self) -> list[InlineKeyboardButton]:
         buttons = []
