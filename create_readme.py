@@ -49,16 +49,20 @@ def update_readme():
 {pyrogram_patch_section}
 """
     
-    # Use regex to find and replace the entire usage section
-    # This pattern matches from "# Usage" to the next header (# something) or end of file
-    usage_pattern = r'# Usage\n.*?(?=\n# |\Z)'
+    # Remove any existing Usage section and expandable sections entirely
+    # First, remove any existing # Usage section and everything after it
+    usage_pattern = r'\n# Usage.*$'
+    readme_content = re.sub(usage_pattern, '', readme_content, flags=re.DOTALL)
     
-    if re.search(usage_pattern, readme_content, re.DOTALL):
-        # Replace the entire usage section
-        new_readme_content = re.sub(usage_pattern, new_usage_section.rstrip(), readme_content, flags=re.DOTALL)
-    else:
-        # If usage section doesn't exist, add it at the end
-        new_readme_content = readme_content + "\n\n" + new_usage_section
+    # Also remove any orphaned expandable sections that might exist
+    details_pattern = r'\n<details>.*?</details>\n*'
+    readme_content = re.sub(details_pattern, '', readme_content, flags=re.DOTALL)
+    
+    # Clean up any trailing whitespace/newlines
+    readme_content = readme_content.rstrip()
+    
+    # Add the new usage section
+    new_readme_content = readme_content + '\n\n' + new_usage_section
     
     # Write the updated content back to README.md
     with open(main_readme_path, 'w', encoding='utf-8') as file:
