@@ -1,6 +1,5 @@
 import os
 import sys
-import re
 import subprocess
 
 def read_file_content(file_path):
@@ -23,20 +22,6 @@ def create_expandable_section(title, content):
 </details>
 """
 
-def clean_readme_content(content):
-    """Clean up the README content by removing all existing expandable sections."""
-    import re
-    # Remove all expandable sections after the Usage heading
-    content = re.sub(
-        r'(# Usage\n\n)(<details>.*?</details>\n)*',
-        r'\1',
-        content,
-        flags=re.DOTALL
-    )
-    # Remove any multiple consecutive newlines
-    content = re.sub(r'\n{3,}', '\n\n', content)
-    return content.strip()
-
 def update_readme():
     # Paths to the README files
     main_readme_path = 'README.md'
@@ -47,15 +32,16 @@ def update_readme():
     pykeyboard_content = read_file_content(pykeyboard_readme_path)
     pyrogram_patch_content = read_file_content(pyrogram_patch_readme_path)
     
-    # Read and clean the main README
-    with open(main_readme_path, 'r', encoding='utf-8') as file:
-        readme_content = clean_readme_content(file.read())
-    
     # Create expandable sections
     pykeyboard_section = create_expandable_section("PyKeyboard", pykeyboard_content)
     pyrogram_patch_section = create_expandable_section("Pyrogram Patch", pyrogram_patch_content)
     
-    # Create the new usage section
+    # Read the main README
+    with open(main_readme_path, 'r', encoding='utf-8') as file:
+        readme_content = file.read()
+    
+    # Find the usage section and replace it with the new content
+    usage_section = "# Usage\n\n"
     new_usage_section = f"""# Usage
 
 {pykeyboard_section}
@@ -63,21 +49,13 @@ def update_readme():
 {pyrogram_patch_section}
 """
     
-    # Insert the new usage section after the installation section or at the end
-    if "# Installation" in readme_content:
-        # Insert after installation section
-        installation_section = re.search(r'(# Installation[\s\S]*?)(?=\n\w|$)', readme_content)
-        if installation_section:
-            insert_point = installation_section.end()
-            new_readme_content = (
-                readme_content[:insert_point] + 
-                "\n\n" + new_usage_section + 
-                readme_content[insert_point:]
-            )
-        else:
-            new_readme_content = readme_content + "\n\n" + new_usage_section
+    if usage_section in readme_content:
+        new_readme_content = readme_content.replace(
+            usage_section,
+            new_usage_section
+        )
     else:
-        # If no installation section, append at the end
+        # If usage section doesn't exist, add it at the end
         new_readme_content = readme_content + "\n\n" + new_usage_section
     
     # Write the updated content back to README.md
