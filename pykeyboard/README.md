@@ -17,7 +17,6 @@
 
 - [Pykeyboard](#pykeyboard)
 - [What's new?](#whats-new)
-- [Installation](#installation)
 - [Documentation](#documentation)
   - [Inline Keyboard](#inline-keyboard)
         - [Parameters:](#parameters)
@@ -60,22 +59,6 @@
 # What's new?
 
 - Minor changes due to update in Kurigram.
-
-# Installation
-
-```shell
-
-pip install pykeyboard-kurigram
-
-```
-
-or
-
-```shell
-
-poetry add pykeyboard-kurigram
-
-```
 
 # Documentation
 
