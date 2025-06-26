@@ -26,8 +26,8 @@ classifiers = [
     "Topic :: Utilities",
 ]
 packages = [
-    {include = "kurigram_addons/pykeyboard"},
-    {include = "kurigram_addons/pyrogram_patch"},
+    {include = "pykeyboard"},
+    {include = "pyrogram_patch"},
 ]
 
 [project.urls]
