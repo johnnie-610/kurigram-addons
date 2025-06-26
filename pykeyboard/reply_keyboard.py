@@ -4,12 +4,14 @@
 # https://opensource.org/licenses/MIT
 # 
 # This file is part of the pykeyboard-kurigram library
+# 
+# pykeyboard/reply_keyboard.py
 
 from dataclasses import dataclass
 from pyrogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
-    ReplyKeyboardRemove, # type: ignore
+    ReplyKeyboardRemove,
     ForceReply,
     KeyboardButtonPollType,
     KeyboardButtonRequestUsers,
@@ -29,13 +31,19 @@ class ReplyKeyboard(ReplyKeyboardMarkup, KeyboardBase):
 
     def __post_init__(self):
         super().__init__(
-            keyboard=self.keyboard, # type: ignore
-            is_persistent=self.is_persistent, # type: ignore
-            resize_keyboard=self.resize_keyboard, # type: ignore
-            one_time_keyboard=self.one_time_keyboard, # type: ignore
-            selective=self.selective, # type: ignore
-            placeholder=self.placeholder, # type: ignore
+            keyboard=self.keyboard,
+            is_persistent=self.is_persistent,
+            resize_keyboard=self.resize_keyboard,
+            one_time_keyboard=self.one_time_keyboard,
+            selective=self.selective,
+            placeholder=self.placeholder,
         )
+    
+    def _update_keyboard(self):
+        """Update the underlying ReplyKeyboardMarkup keyboard"""
+        # Update the inline_keyboard attribute that Pyrogram uses
+        if hasattr(self, 'keyboard'):
+            object.__setattr__(self, 'keyboard', self.keyboard)
 
 
 @dataclass
@@ -48,15 +56,17 @@ class ReplyButton(KeyboardButton, Button):
     web_app: WebAppInfo | None = None
 
     def __post_init__(self):
-        super().__post_init__()
-        super(KeyboardButton, self).__init__(
-            text=self.text, # type: ignore
-            request_contact=self.request_contact, # type: ignore
-            request_location=self.request_location, # type: ignore
-            request_poll=self.request_poll, # type: ignore
-            request_users = self.request_users, # type: ignore
-            request_chat = self.request_chat, # type: ignore
-            web_app=self.web_app, # type: ignore
+        Button.__post_init__(self)
+        # Fix: Use direct initialization instead of super() chain
+        KeyboardButton.__init__(
+            self,
+            text=self.text,
+            request_contact=self.request_contact,
+            request_location=self.request_location,
+            request_poll=self.request_poll,
+            request_users=self.request_users,
+            request_chat=self.request_chat,
+            web_app=self.web_app,
         )
 
 
@@ -65,7 +75,7 @@ class PyReplyKeyboardRemove(ReplyKeyboardRemove):
     selective: bool | None = None
 
     def __post_init__(self):
-        super().__init__(selective=self.selective) # type: ignore
+        super().__init__(selective=self.selective)
 
 
 @dataclass
@@ -74,4 +84,4 @@ class PyForceReply(ForceReply):
     placeholder: str | None = None
 
     def __post_init__(self):
-        super().__init__(selective=self.selective, placeholder=self.placeholder) # type: ignore
+        super().__init__(selective=self.selective, placeholder=self.placeholder)

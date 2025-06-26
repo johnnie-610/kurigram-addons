@@ -4,6 +4,8 @@
 # https://opensource.org/licenses/MIT
 # 
 # This file is part of the pykeyboard-kurigram library
+# 
+# pykeyboard/inline_keyboard.py
 
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dataclasses import dataclass
@@ -40,15 +42,21 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
         }
 
     def __post_init__(self):
-        super().__init__(inline_keyboard=self.keyboard) # type: ignore
+        super().__init__(inline_keyboard=self.keyboard)
         self.callback_pattern = ""
         self.count_pages = 0
         self.current_page = 0
+    
+    def _update_keyboard(self):
+        """Update the underlying InlineKeyboardMarkup keyboard"""
+        # Update the inline_keyboard attribute that Pyrogram uses
+        if hasattr(self, 'inline_keyboard'):
+            object.__setattr__(self, 'inline_keyboard', self.keyboard)
 
     @staticmethod
     @lru_cache(maxsize=128)
     def _create_button(text: str, callback_data: str) -> InlineKeyboardButton:
-        """Create a cached button with optimized parameters."""
+        """Create cached button with optimized parameters."""
         return InlineButton(text=text, callback_data=callback_data)
 
     def paginate(
@@ -77,7 +85,8 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
         else:
             pagination = self._build_large_pagination()
 
-        self.keyboard.append(pagination) # type: ignore
+        self.keyboard.append(pagination)
+        self._update_keyboard()  # Update the underlying structure
 
     def _build_small_pagination(self) -> list[InlineKeyboardButton]:
         return [
@@ -111,12 +120,12 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
                 i = self.count_pages
             else:
                 text = str(i)
-            buttons.append( # type: ignore
+            buttons.append(
                 self._create_button(
                     text=text, callback_data=self.callback_pattern.format(number=i)
                 )
             )
-        return buttons # type: ignore
+        return buttons
 
     def _build_middle_pagination(self) -> list[InlineKeyboardButton]:
         return [
@@ -190,3 +199,4 @@ class InlineKeyboard(InlineKeyboardMarkup, KeyboardBase):
         self.keyboard = [
             buttons[i : i + row_width] for i in range(0, len(buttons), row_width)
         ]
+        self._update_keyboard()  # Update the underlying structure
