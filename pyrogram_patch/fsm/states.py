@@ -36,6 +36,7 @@ class StateItem:
         for name, obj in vars(cls).items():
             if obj is self:
                 return "StatesGroup_" + cls.__name__ + "_State_" + name
+        return None
 
 
 @dataclass(init=False, frozen=True)

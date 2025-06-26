@@ -1,0 +1,10 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: update-readme
+        name: Update README
+        entry: python create_readme.py
+        language: system
+        always_run: true
+        pass_filenames: false
+        verbose: true

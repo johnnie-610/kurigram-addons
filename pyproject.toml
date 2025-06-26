@@ -1,16 +1,45 @@
-[tool.poetry]
+[project]
 name = "kurigram-addons"
-version = "0.1.4"
-description = "This package brings together several addons to kurigram including pykeyboard and FSM"
-authors = ["Johnnie <99084912+johnnie-610@users.noreply.github.com>"]
-license = "MIT"
-readme = "README.md"
-packages = [{include = "pykeyboard"}, {include = "pyrogram_patch"}]
+dynamic = ["classifiers"]
+version = "0.1.5"
+description = "A collection of useful addons for the Kurigram library"
+authors = [
+    {name = "Johnnie",email = "johnnie610@duck.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.10,<4.0"
+keywords = ["kurigram", "addons", "pykeyboard", "pyrogram-patch"]
 
-[tool.poetry.dependencies]
-python = "^3.8"
-kurigram = "^2.1.35"
+
+[tool.poetry]
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+packages = [
+    {include = "kurigram_addons/pykeyboard"},
+    {include = "kurigram_addons/pyrogram_patch"},
+]
+
+[project.urls]
+repository = "https://github.com/johnnie-610/kurigram-addons"
+bugs = "https://github.com/johnnie-610/kurigram-addons/issues"
+
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+kurigram = "^2.2.6"
+pre-commit = "^4.2.0"
+

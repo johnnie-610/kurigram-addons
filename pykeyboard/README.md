@@ -3,7 +3,11 @@
 <img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/logo.png" alt="pykeyboard">
 </p>
 
-<p><h2>🎉This is pykeyboard for <a href="https://pypi.org/project/Kurigram/"</a>Kuigram 🎉</h2></p>
+![PyPI](https://img.shields.io/pypi/v/pykeyboard-kurigram)
+[![Downloads](https://pepy.tech/badge/pykeyboard-kurigram)](https://pepy.tech/project/pykeyboard-kurigram)
+![GitHub](https://img.shields.io/github/license/johnnie-610/pykeyboard)
+
+ <p><h2>🎉This is pykeyboard for <a href="https://github.com/KurimuzonAkuma/pyrogram">Kurigram</a> 🎉</h2></p>
  <br>
  <p><strong><em>No need to change your code, just install the library and you're good to go.</em></strong></p>
 
@@ -12,11 +16,11 @@
 # Pykeyboard
 
 - [Pykeyboard](#pykeyboard)
-- [What&#39;s new?](#whats-new)
+- [What's new?](#whats-new)
 - [Installation](#installation)
 - [Documentation](#documentation)
   - [Inline Keyboard](#inline-keyboard)
-    - [Parameters:](#parameters)
+        - [Parameters:](#parameters)
     - [Inline Keyboard add buttons](#inline-keyboard-add-buttons)
       - [Code](#code)
       - [Result](#result)
@@ -45,7 +49,7 @@
       - [Code](#code-7)
       - [Result](#result-7)
   - [Reply Keyboard](#reply-keyboard)
-    - [Parameters:](#parameters-3)
+      - [Parameters:](#parameters-3)
     - [Reply Keyboard add buttons](#reply-keyboard-add-buttons)
       - [Code](#code-8)
       - [Result](#result-8)
@@ -56,6 +60,22 @@
 # What's new?
 
 - Minor changes due to update in Kurigram.
+
+# Installation
+
+```shell
+
+pip install pykeyboard-kurigram
+
+```
+
+or
+
+```shell
+
+poetry add pykeyboard-kurigram
+
+```
 
 # Documentation
 
@@ -128,7 +148,7 @@ from pykeyboard import InlineKeyboard
 
 - count_pages (integer)
 - current_page (integer)
-- callback_pattern (string) - use of the `{number}` pattern is `<ins>`required`</ins>`
+- callback_pattern (string) - use of the `{number}` pattern is <ins>required</ins>
 
 #### Pagination 3 pages
 
@@ -217,7 +237,7 @@ from pykeyboard import InlineKeyboard
 
 #### Parameters:
 
-- callback_pattern (string) - use of the `{locale}` pattern is `<ins>`required`</ins>`
+- callback_pattern (string) - use of the `{locale}` pattern is <ins>required</ins>
 - locales (string | list) - list of language codes
   - be_BY - Belarusian
   - de_DE - German
@@ -233,6 +253,7 @@ from pykeyboard import InlineKeyboard
   - uk_UA - Ukrainian
   - uz_UZ - Uzbek
 - row_width (integer, default 2)
+
 
 #### Code
 
