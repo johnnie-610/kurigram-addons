@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import re
 
 def read_file_content(file_path):
     """Read content from a file."""
@@ -40,8 +41,7 @@ def update_readme():
     with open(main_readme_path, 'r', encoding='utf-8') as file:
         readme_content = file.read()
     
-    # Find the usage section and replace it with the new content
-    usage_section = "# Usage\n\n"
+    # Create the new usage section
     new_usage_section = f"""# Usage
 
 {pykeyboard_section}
@@ -49,11 +49,13 @@ def update_readme():
 {pyrogram_patch_section}
 """
     
-    if usage_section in readme_content:
-        new_readme_content = readme_content.replace(
-            usage_section,
-            new_usage_section
-        )
+    # Use regex to find and replace the entire usage section
+    # This pattern matches from "# Usage" to the next header (# something) or end of file
+    usage_pattern = r'# Usage\n.*?(?=\n# |\Z)'
+    
+    if re.search(usage_pattern, readme_content, re.DOTALL):
+        # Replace the entire usage section
+        new_readme_content = re.sub(usage_pattern, new_usage_section.rstrip(), readme_content, flags=re.DOTALL)
     else:
         # If usage section doesn't exist, add it at the end
         new_readme_content = readme_content + "\n\n" + new_usage_section
