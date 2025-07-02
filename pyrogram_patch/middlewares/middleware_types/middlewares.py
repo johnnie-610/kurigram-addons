@@ -1,122 +1,142 @@
-from pyrogram.handlers.callback_query_handler import CallbackQueryHandler
-from pyrogram.handlers.chat_join_request_handler import ChatJoinRequestHandler
-from pyrogram.handlers.chat_member_updated_handler import ChatMemberUpdatedHandler
-from pyrogram.handlers.chosen_inline_result_handler import ChosenInlineResultHandler
-from pyrogram.handlers.deleted_messages_handler import DeletedMessagesHandler
-from pyrogram.handlers.disconnect_handler import DisconnectHandler
-from pyrogram.handlers.edited_message_handler import EditedMessageHandler
-from pyrogram.handlers.inline_query_handler import InlineQueryHandler
-from pyrogram.handlers.message_handler import MessageHandler
-from pyrogram.handlers.poll_handler import PollHandler
-from pyrogram.handlers.raw_update_handler import RawUpdateHandler
-from pyrogram.handlers.user_status_handler import UserStatusHandler
+from typing import Type, Any, Tuple, TypeVar
+from pyrogram.handlers import (
+    CallbackQueryHandler,
+    ChatJoinRequestHandler,
+    ChatMemberUpdatedHandler,
+    ChosenInlineResultHandler,
+    DeletedMessagesHandler,
+    DisconnectHandler,
+    EditedMessageHandler,
+    InlineQueryHandler,
+    MessageHandler,
+    PollHandler,
+    RawUpdateHandler,
+    UserStatusHandler,
+)
+from pyrogram.handlers.handler import Handler
+
+T = TypeVar('T', bound=Handler)
 
 
-class OnUpdateMiddleware:
-    """middleware for all"""
+class BaseMiddleware:
+    """Base middleware class for all Pyrogram middlewares."""
+    handler_type: Type[Handler]
+    
+    def __eq__(self, other: Any) -> bool:
+        """Check if this middleware matches a handler type.
+        
+        Args:
+            other: The handler type to compare against
+            
+        Returns:
+            bool: True if this middleware handles the given handler type
+        """
+        return other == self.handler_type
+    
+    def __hash__(self) -> int:
+        """Make the middleware hashable."""
+        return hash(self.handler_type)
 
-    def __eq__(self, other) -> bool:
+
+class OnUpdateMiddleware(BaseMiddleware):
+    """Middleware that matches all handler types."""
+    
+    def __eq__(self, other: Any) -> bool:
         return True
+    
+    def __hash__(self) -> int:
+        return hash('OnUpdateMiddleware')
 
 
-class OnEditedMessageMiddleware:
-    """middleware for on_edited_message"""
-
-    def __eq__(self, other) -> bool:
-        return other == EditedMessageHandler
+class OnEditedMessageMiddleware(BaseMiddleware):
+    """Middleware for handling edited message events."""
+    handler_type = EditedMessageHandler
 
 
-class OnUserStatusMiddleware:
-    """middleware for on_user_status"""
-
-    def __eq__(self, other) -> bool:
-        return other == UserStatusHandler
+class OnUserStatusMiddleware(BaseMiddleware):
+    """Middleware for handling user status updates."""
+    handler_type = UserStatusHandler
 
 
-class OnRawUpdateMiddleware:
-    """middleware for on_raw_update"""
-
-    def __eq__(self, other) -> bool:
-        return other == RawUpdateHandler
+class OnRawUpdateMiddleware(BaseMiddleware):
+    """Middleware for handling raw updates."""
+    handler_type = RawUpdateHandler
 
 
-class OnChosenInlineResultMiddleware:
-    """middleware for on_chosen_inline_result"""
-
-    def __eq__(self, other) -> bool:
-        return other == ChosenInlineResultHandler
+class OnChosenInlineResultMiddleware(BaseMiddleware):
+    """Middleware for handling chosen inline results."""
+    handler_type = ChosenInlineResultHandler
 
 
-class OnDeletedMessagesMiddleware:
-    """middleware for on_deleted_messages"""
-
-    def __eq__(self, other) -> bool:
-        return other == DeletedMessagesHandler
+class OnDeletedMessagesMiddleware(BaseMiddleware):
+    """Middleware for handling deleted messages."""
+    handler_type = DeletedMessagesHandler
 
 
-class OnChatMemberUpdatedMiddleware:
-    """middleware for on_chat_member_updated"""
-
-    def __eq__(self, other) -> bool:
-        return other == ChatMemberUpdatedHandler
+class OnChatMemberUpdatedMiddleware(BaseMiddleware):
+    """Middleware for handling chat member updates."""
+    handler_type = ChatMemberUpdatedHandler
 
 
-class OnChatJoinRequestMiddleware:
-    """middleware for on_chat_join_request"""
-
-    def __eq__(self, other) -> bool:
-        return other == ChatJoinRequestHandler
+class OnChatJoinRequestMiddleware(BaseMiddleware):
+    """Middleware for handling chat join requests."""
+    handler_type = ChatJoinRequestHandler
 
 
-class OnCallbackQueryMiddleware:
-    """middleware for on_callback_query"""
-
-    def __eq__(self, other) -> bool:
-        return other == CallbackQueryHandler
+class OnCallbackQueryMiddleware(BaseMiddleware):
+    """Middleware for handling callback queries."""
+    handler_type = CallbackQueryHandler
 
 
-class OnInlineQueryMiddleware:
-    """middleware for on_inline_query"""
-
-    def __eq__(self, other) -> bool:
-        return other == InlineQueryHandler
+class OnInlineQueryMiddleware(BaseMiddleware):
+    """Middleware for handling inline queries."""
+    handler_type = InlineQueryHandler
 
 
-class OnDisconnectMiddleware:
-    """middleware for on_disconnect"""
-
-    def __eq__(self, other) -> bool:
-        return other == DisconnectHandler
+class OnDisconnectMiddleware(BaseMiddleware):
+    """Middleware for handling disconnection events."""
+    handler_type = DisconnectHandler
 
 
-class OnMessageMiddleware:
-    """middleware for on_message"""
-
-    def __eq__(self, other) -> bool:
-        return other == MessageHandler
+class OnMessageMiddleware(BaseMiddleware):
+    """Middleware for handling new messages."""
+    handler_type = MessageHandler
 
 
-class OnPoolMiddleware:
-    """middleware for on_pool"""
-
-    def __eq__(self, other) -> bool:
-        return other == PollHandler
+class OnPollMiddleware(BaseMiddleware):
+    """Middleware for handling poll updates."""
+    handler_type = PollHandler
 
 
 class MixedMiddleware:
-    """pass the types of handlers from pyrogram.handlers during initialization that the malware will process
-
-    patch_manager.include_middleware(CheckIgnoreMiddleware((MessageHandler, EditedMessageHandler), False))
-
-
+    """Middleware that can handle multiple handler types.
+    
+    Example:
+        patch_manager.include_middleware(CheckIgnoreMiddleware((MessageHandler, EditedMessageHandler)))
+    
     class CheckIgnoreMiddleware(MixedMiddleware):
-    def __init__(self, handlers: tuple, ignore: bool) -> None:
-        self.ignore = ignore  # it can be any value you want
-        super().__init__(handlers)
+        def __init__(self, handlers: Tuple[Type[Handler], ...], ignore: bool = False) -> None:
+            self.ignore = ignore  # Custom middleware-specific attribute
+            super().__init__(handlers)
     """
-
-    def __init__(self, handlers: tuple) -> None:
+    
+    def __init__(self, handlers: Tuple[Type[Handler], ...]) -> None:
+        """Initialize the mixed middleware with the specified handler types.
+        
+        Args:
+            handlers: Tuple of handler types this middleware should handle
+            
+        Raises:
+            ValueError: If no handlers are provided
+        """
+        if not handlers:
+            raise ValueError("At least one handler type must be provided")
         self._handlers = handlers
-
-    def __eq__(self, other) -> bool:
+    
+    def __eq__(self, other: Any) -> bool:
+        """Check if this middleware matches any of its registered handler types."""
         return other in self._handlers
+    
+    def __hash__(self) -> int:
+        """Make the middleware hashable based on its handlers."""
+        return hash(self._handlers)

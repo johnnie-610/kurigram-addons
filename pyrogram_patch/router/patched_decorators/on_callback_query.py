@@ -7,43 +7,85 @@
 # For the full copyright and license information, please view the LICENSE
 # file that was distributed with this source code
 
-from typing import Callable
+from typing import Callable, Optional, TypeVar, Any, cast
+from functools import wraps
 
 import pyrogram
-
+from pyrogram.filters import Filter as PyrogramFilter
+from pyrogram.handlers import CallbackQueryHandler
 import pyrogram_patch
+
+T = TypeVar('T', bound=Callable[..., Any])
+
+__all__ = ['OnCallbackQuery']
 
 
 class OnCallbackQuery:
-    def on_callback_query(self=None, filters=None, group: int = 0) -> Callable:
+    """A class providing decorators for handling callback queries in Pyrogram.
+    
+    This class provides the `on_callback_query` decorator which can be used to
+    register callback query handlers in a Pyrogram application.
+    """
+    
+    __slots__ = ()  # For memory efficiency
+    def on_callback_query(
+        self=None,
+        filters: Optional[PyrogramFilter] = None,
+        group: int = 0
+    ) -> Callable[[T], T]:
         """Decorator for handling callback queries.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
         :obj:`~pyrogram.handlers.CallbackQueryHandler`.
 
-        Parameters:
-            filters (:obj:`~pyrogram.filters`, *optional*):
-                Pass one or more filters to allow only a subset of callback queries to be passed
-                in your function.
+        The decorated function should have the following signature:
+            async def callback(client: Client, callback_query: CallbackQuery) -> Any:
 
-            group (``int``, *optional*):
-                The group identifier, defaults to 0.
+        Parameters:
+            filters: One or more filters to allow only a subset of callback queries
+                to be passed in your function. Must be a valid Pyrogram filter.
+            group: The group identifier. Defaults to 0.
+
+        Returns:
+            The decorated function.
+
+        Raises:
+            RuntimeError: If the decorator is not used in a Router instance or as a decorator.
+            TypeError: If the filters are not valid Pyrogram filters.
+            AttributeError: If the Router instance is not properly initialized.
         """
 
-        def decorator(func: Callable) -> Callable:
-            if isinstance(self, pyrogram_patch.router.Router):
-                if self._app is not None:
-                    self._app.add_handler(
-                        pyrogram.handlers.CallbackQueryHandler(func, filters), group
-                    )
-                else:
-                    self._decorators_storage.append((pyrogram.handlers.CallbackQueryHandler(func, filters), group))
+        def decorator(func: T) -> T:
+            if not callable(func):
+                raise TypeError("The decorated object must be callable")
 
-            else:
+            if not isinstance(self, pyrogram_patch.router.Router):
                 raise RuntimeError(
-                    "you should only use this in routers, and only as a decorator"
+                    "This decorator must be used as a method within a Router instance."
                 )
 
-            return func
+            if not hasattr(self, '_app') or not hasattr(self, '_decorators_storage'):
+                raise AttributeError(
+                    "Router instance is not properly initialized. "
+                    "Missing required attributes: _app or _decorators_storage"
+                )
 
+            if filters is not None and not isinstance(filters, PyrogramFilter):
+                raise TypeError(
+                    f"filters must be a Pyrogram filter, got {type(filters).__name__}"
+                )
+
+            @wraps(func)
+            async def wrapper(client: 'pyrogram.Client', callback_query: 'pyrogram.types.CallbackQuery') -> Any:
+                return await func(client, callback_query)
+
+            handler = CallbackQueryHandler(wrapper, filters)
+            
+            if self._app is not None:
+                self._app.add_handler(handler, group)
+            else:
+                self._decorators_storage.append((handler, group))
+            
+            return cast(T, wrapper)
+            
         return decorator

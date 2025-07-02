@@ -109,3 +109,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# DEV STUFF
+
+# Update handlers
+update_handlers.py
+
