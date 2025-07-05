@@ -5,7 +5,7 @@ interactions in Pyrogram bots, supporting various storage backends.
 """
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
 
 # Re-export main components
 from .base_storage import (
@@ -15,7 +15,24 @@ from .base_storage import (
     StateNotFoundError,
     StateValidationError,
 )
+from .context import FSMContext
 from .states import State, StateItem, StatesGroup
+
+# For type checking only
+if TYPE_CHECKING:
+    from pyrogram.types import Message, CallbackQuery
+
+__all__ = [
+    'FSMContext',
+    'BaseStorage',
+    'State',
+    'StateData',
+    'StateItem',
+    'StatesGroup',
+    'StorageError',
+    'StateNotFoundError',
+    'StateValidationError',
+]
 
 # Add version if not in type checking mode
 if not TYPE_CHECKING:

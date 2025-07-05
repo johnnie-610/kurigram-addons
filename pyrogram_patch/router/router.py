@@ -8,6 +8,8 @@ from .patched_decorators import PatchedDecorators
 GroupT = TypeVar('GroupT', bound=int)
 
 
+from .patched_decorators import PatchedDecorators
+
 class Router(PatchedDecorators):
     """
     A router class that manages Pyrogram event handlers with a clean decorator interface.

@@ -142,7 +142,8 @@ class PatchHelper:
         Returns:
             An existing PatchHelper instance or a new one if not found
         """
-        helper = PatchDataPool.get_helper_from_pool(update)
+        from .patch_data_pool import global_pool
+        helper = global_pool.get_helper_from_pool(update)
         return helper if helper is not None else cls()
     
     @staticmethod

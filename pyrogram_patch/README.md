@@ -1,303 +1,166 @@
-# 🔧 pyrogram_patch
+# pyrogram_patch
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Kurigram](https://img.shields.io/badge/Built%20for-Kurigram-blue)](https://github.com/JohnnieJohnnie/kurigram)
+[![PyPI](https://img.shields.io/pypi/v/kurigram-addons)](https://pypi.org/project/kurigram-addons/)
+[![Downloads](https://static.pepy.tech/badge/kurigram-addons)](https://pepy.tech/project/kurigram-addons)
+[![Telegram](https://img.shields.io/badge/chat-telegram-blue)](https://t.me/kurigram_addons_chat)
 
-**pyrogram_patch** is a powerful Python library that extends Pyrogram with advanced middleware support, Finite State Machine (FSM) capabilities, and thread-safe data management, making it easier to build complex Telegram bots with better code organization and state management.
-
+**pyrogram_patch** is a powerful extension for Pyrogram that enhances it with advanced features for building robust Telegram bots. It provides middleware support, Finite State Machine (FSM) capabilities, and thread-safe data management, making it easier to develop complex bot interactions.
 
 ## ✨ Features
 
-- 🔀 **Middleware System**: Intercept and process updates before they reach your handlers
-- 🤖 **Finite State Machine (FSM)**: Manage conversation flows and user states
-- 🧩 **Router Support**: Organize your handlers into modular components
-- 🧵 **Thread-Safe**: Built with thread safety in mind for high-load applications
-- 🧠 **Memory Efficient**: Uses weak references to prevent memory leaks
-- 💾 **Flexible Storage**: Built-in memory storage with support for custom storage backends (Redis, MongoDB, PostgreSQL, etc.)
-- 🎯 **Type Safety**: Full type hints support for better development experience
-- 📦 **Easy Integration**: Simple API that works seamlessly with existing Pyrogram code
+- **Middleware System**: Intercept and process updates with a powerful middleware pipeline
+- **Finite State Machine (FSM)**: Manage complex conversation flows with ease
+- **Router Support**: Organize your handlers into modular components
+- **Thread-Safe**: Built with thread safety for high-load applications
+- **Flexible Storage**: Multiple storage backends with Redis and MongoDB support
+- **Type Safety**: Full type hints for better development experience
+- **Easy Integration**: Works seamlessly with existing Pyrogram code
 
 ## 🚀 Quick Start
-
-### Using Custom Storage
-
-Pyrogram Patch makes it easy to implement your own storage backend. Here's how to create a custom storage:
-
-1. **Create a storage class** by subclassing `CustomStorage`:
-
-```python
-from pyrogram_patch.fsm.storages.custom_storage import CustomStorage
-from pyrogram_patch.fsm.base_storage import StateData, StateNotFoundError
-
-class MyCustomStorage(CustomStorage):
-    def __init__(self, connection_string: str):
-        super().__init__()
-        # Initialize your storage client here
-        self.client = MyStorageClient(connection_string)
-    
-    async def get_state_data(self, key: str) -> StateData:
-        """Retrieve state data from your storage."""
-        data = await self.client.get(key)
-        if data is None:
-            raise StateNotFoundError(f"State not found: {key}")
-        return StateData(**data)
-    
-    async def set_state(self, state: str, key: str, 
-                       data: Optional[Dict[str, Any]] = None,
-                       ttl: Optional[int] = None) -> None:
-        """Save state data to your storage."""
-        state_data = StateData(
-            state=state,
-            data=data or {},
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-            expires_at=(datetime.utcnow() + timedelta(seconds=ttl)) if ttl else None
-        )
-        await self.client.set(key, state_data.__dict__, ex=ttl)
-    
-    # Implement other required methods...
-```
-
-2. **Use your custom storage** in your application:
-
-```python
-from pyrogram import Client
-from pyrogram_patch import patch
-
-app = Client("my_bot")
-patch_manager = patch(app)
-
-# Initialize with your custom storage
-storage = MyCustomStorage("your_connection_string")
-patch_manager.set_storage(storage)
-
-# Your bot code here...
-```
-
-### Built-in Storage Options
-
-Pyrogram Patch comes with several built-in storage options:
-
-- `MemoryStorage`: Simple in-memory storage (not persistent)
-- `MongoStorage`: MongoDB-based storage
-- `RedisStorage`: Redis-based storage
-
-Example using built-in storage:
-
-```python
-from pyrogram_patch.fsm.storages import MemoryStorage
-
-storage = MemoryStorage()  # Simple in-memory storage
-# OR
-from pyrogram_patch.fsm.storages import MongoStorage
-storage = MongoStorage("mongodb://localhost:27017/", "my_database")
-```
 
 ### Basic Usage
 
 ```python
 from pyrogram import Client, filters
-from pyrogram_patch import patch
-from pyrogram_patch.fsm import StatesGroup, State, StateItem
-from pyrogram_patch.fsm.storages import MemoryStorage
+from pyrogram_patch import patch, Router
+from pyrogram_patch.fsm import StatesGroup, State, StateFilter
 
-# Create a Pyrogram client
-app = Client("my_bot", api_id=123456, api_hash="your_api_hash", bot_token="your_bot_token")
+# Initialize the client and router
+app = Client("my_bot")
+router = Router()
 
-# Patch the client to enable middleware and FSM features
+# Apply the patch
 patch_manager = patch(app)
 
-# Set up storage for FSM (in-memory storage for this example)
-storage = MemoryStorage()
-patch_manager.set_storage(storage)
+# Define states
+class Registration(StatesGroup):
+    waiting_for_name = State()
+    waiting_for_age = State()
 
-# Define your states for a conversation
-class UserRegistration(StatesGroup):
-    waiting_name = StateItem()
-    waiting_age = StateItem()
+# Command handler with router
+@router.on_message(filters.command("start") & filters.private)
+async def start(client, message, state):
+    await state.set_state(Registration.waiting_for_name)
+    await message.reply("Welcome! Please enter your name:")
 
-# Start the registration process
-@app.on_message(filters.command("register") & filters.private)
-async def start_registration(client, message, state: State):
-    await client.send_message(message.chat.id, "Please enter your name:")
-    await state.set_state(UserRegistration.waiting_name)
+# State handler with router
+@router.on_message(StateFilter(Registration.waiting_for_name) & filters.private)
+async def process_name(client, message, state):
+    await state.update_data(name=message.text)
+    await state.set_state(Registration.waiting_for_age)
+    await message.reply(f"Nice to meet you, {message.text}! How old are you?")
 
-# Handle name input
-@app.on_message(filters.private & StateFilter(UserRegistration.waiting_name))
-async def process_name(client, message, state: State):
-    await state.set_data("name", message.text)
-    await client.send_message(message.chat.id, "Please enter your age:")
-    await state.set_state(UserRegistration.waiting_age)
-
-# Handle age input
-@app.on_message(filters.private & StateFilter(UserRegistration.waiting_age))
-async def process_age(client, message, state: State):
-    name = await state.get_data("name")
-    await client.send_message(
-        message.chat.id,
-        f"Registration completed!\nName: {name}\nAge: {message.text}"
-    )
-    await state.finish()
+# Include router in the application
+app.include_router(router)
 
 # Run the bot
 if __name__ == "__main__":
     app.run()
 ```
 
-## 📚 Documentation
+## 🔌 Middleware System
 
-### 🔧 Basic Setup
-
-#### Patching the Client
+Easily add middleware to process updates before they reach your handlers:
 
 ```python
-from pyrogram import Client
-from pyrogram_patch import patch
+from pyrogram_patch.middlewares import BaseMiddleware
 
-# Create and patch the client
-app = Client("my_bot")
-patch_manager = patch(app)
-```
-
-### 🔄 Migration Guide (v0.2.0+)
-
-#### PatchDataPool Changes
-
-The `PatchDataPool` class has been completely refactored for better thread safety and memory management:
-
-### Old Way (v0.1.x)
-
-```python
-# Direct attribute access
-PatchDataPool.update_pool = {}
-PatchDataPool.pyrogram_patch_middlewares = []
-```
-
-### New Way (v0.2.0+)
-
-```python
-# Recommended: Create your own instance
-from pyrogram_patch.patch_data_pool import PatchDataPool
-pool = PatchDataPool()
-pool.include_helper_to_pool(update, helper)
-
-# Or use the global instance (for backward compatibility)
-from pyrogram_patch.patch_data_pool import global_pool
-global_pool.include_helper_to_pool(update, helper)
-```
-
-#### Backward Compatibility
-
-- The global instance `global_pool` is provided for backward compatibility
-- Direct attribute access still works but is not recommended for new code
-- Old imports will continue to work but may be deprecated in future versions
-
-### 🔀 Middleware System
-
-#### Creating Middleware
-
-```python
-from pyrogram_patch.middlewares.middleware_types import OnUpdateMiddleware
-from pyrogram_patch.patch_helper import PatchHelper
-
-class LoggingMiddleware(OnUpdateMiddleware):
-    def __init__(self, log_file: str = "bot.log"):
-        self.log_file = log_file
-
-    async def __call__(self, update, client, patch_helper: PatchHelper):
-        # Access thread-safe data storage
-        patch_helper.data["request_time"] = datetime.datetime.now()
+class AuthMiddleware(BaseMiddleware):
+    def __init__(self, allowed_users: list):
+        self.allowed_users = allowed_users
         
-        # Skip processing if needed
-        if some_condition:
-            await patch_helper.skip_handler()
+    async def __call__(self, update, client, patch_helper):
+        if update.from_user.id not in self.allowed_users:
+            await update.reply("Access denied!")
+            return None  # Stop processing
+        return await self.next(update, client, patch_helper)
+
+# Register middleware
+middleware_manager = MiddlewareManager()
+middleware_manager.register(MessageHandler, AuthMiddleware([12345678]))
 ```
 
-### 🧠 State Management
+## 💾 Storage Options
 
-#### Using FSM
+### Built-in Storage Backends
 
 ```python
-from pyrogram_patch.fsm import StatesGroup, State, StateItem
+from pyrogram_patch.fsm.storages import MemoryStorage, RedisStorage, MongoStorage
 
-class PizzaOrder(StatesGroup):
-    selecting_size = StateItem()
-    selecting_toppings = StateItem()
-    confirming_order = StateItem()
+# In-memory storage (not persistent across restarts)
+storage = MemoryStorage()
 
-@app.on_message(filters.command("order") & filters.private)
-async def start_order(client, message, state: State):
-    await message.reply("What size pizza would you like?")
-    await state.set_state(PizzaOrder.selecting_size)
+# Redis storage (persistent)
+redis_storage = RedisStorage(
+    host="localhost",
+    port=6379,
+    db=0,
+    ttl=86400  # 24 hours
+)
+
+# MongoDB storage (persistent with document support)
+mongo_storage = MongoStorage(
+    host="mongodb://localhost:27017/",
+    db_name="bot_states",
+    collection_name="user_states"
+)
 ```
 
-### 🧩 Router Support
+### Custom Storage
 
-#### Creating and Using Routers
-
-```python
-from pyrogram import filters
-from pyrogram_patch.router import Router
-
-router = Router()
-
-@router.on_message(filters.command("start"))
-async def start_command(client, message):
-    await message.reply("Welcome to the bot!")
-
-# Include router in your application
-patch_manager.include_router(router)
-```
-
-### 🔒 Thread Safety
-
-All components are designed with thread safety in mind:
-
-- `PatchDataPool` uses `RLock` for thread-safe operations
-- `PatchHelper` provides thread-safe data storage
-- All public methods are designed to be thread-safe
-
-
-## 📦 Advanced Usage
-
-### Custom Storage Backend
+Implement your own storage by extending the `BaseStorage` class:
 
 ```python
-from typing import Dict, Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
-from pyrogram_patch.fsm import BaseStorage
+from pyrogram_patch.fsm.base_storage import BaseStorage
+from pyrogram_patch.fsm.states import StateData
 
 class CustomStorage(BaseStorage):
-    def __init__(self):
-        self._storage: Dict[str, dict] = {}
+    def __init__(self, connection_string: str):
+        self.connection = self._connect(connection_string)
     
-    async def get_state(self, key: str) -> Optional[str]:
-        if key in self._storage:
-            return self._storage[key].get("state")
-        return None
+    async def get_state(self, key: str) -> Optional[StateData]:
+        data = await self.connection.get(f"state:{key}")
+        return StateData(**data) if data else None
     
-    async def set_state(self, key: str, state: str) -> None:
-        if key not in self._storage:
-            self._storage[key] = {}
-        self._storage[key]["state"] = state
-        self._storage[key]["updated_at"] = datetime.now()
+    async def set_state(self, key: str, state_data: StateData) -> None:
+        await self.connection.set(
+            f"state:{key}",
+            state_data.dict(),
+            ex=state_data.ttl or 86400  # Default 24h TTL
+        )
     
-    # Implement other required methods...
+    async def delete_state(self, key: str) -> None:
+        await self.connection.delete(f"state:{key}")
+    
+    async def _cleanup(self) -> None:
+        """Optional: Clean up expired states"""
+        pass
 ```
 
-### Error Handling
+## 📚 Documentation
 
-```python
-from pyrogram_patch.exceptions import StateNotFoundError
+For complete documentation, including advanced usage and API reference, visit:
 
-@app.on_message(filters.private)
-async def handle_message(client, message, state: State):
-    try:
-        current_state = await state.get_state()
-        # Process message...
-    except StateNotFoundError:
-        await message.reply("Please start a new session with /start")
-```
+- [Kurigram Documentation](https://docs.kurigram.live/)
+- [pyrogram_patch Documentation](/pyrogram_patch/DOCUMENTATION.md)
 
-Made with ❤️ 
+## 💬 Community
+
+Join our community for support and discussions:
+
+- [Telegram Group](https://t.me/kurigram_addons_chat)
+- [GitHub Issues](https://github.com/johnnie-610/kurigram-addons/issues)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+🥳 Have fun with pyrogram_patch! 🎉

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, AsyncIterator, cast, Tuple
 
 from redis.asyncio import Redis
@@ -77,23 +77,36 @@ class RedisStorage(BaseStorage):
         """Get state metadata from Redis."""
         meta_key = self._get_key(META_PREFIX, key)
         meta = await self._redis.hgetall(meta_key)
-        
+
         if not meta:
             raise StateNotFoundError(f"State with key '{key}' not found")
-            
+
         try:
-            state = meta[b'state'].decode()
-            created_at = datetime.fromisoformat(meta[b'created_at'].decode())
-            updated_at = datetime.fromisoformat(meta[b'updated_at'].decode())
-            expires_at = (
-                datetime.fromisoformat(meta[b'expires_at'].decode())
-                if meta.get(b'expires_at')
-                else None
-            )
+            # Helper function to safely get and decode a value
+            def get_value(field: str, default=None):
+                value = meta.get(field.encode() if isinstance(field, str) else field, default)
+                if value is not None and not isinstance(value, str):
+                    return value.decode()
+                return value
+
+            state = get_value('state')
+            created_at_str = get_value('created_at')
+            updated_at_str = get_value('updated_at')
+            expires_at_str = get_value('expires_at')
+            
+            # Parse datetimes
+            created_at = datetime.fromisoformat(created_at_str) if created_at_str else None
+            updated_at = datetime.fromisoformat(updated_at_str) if updated_at_str else None
+            expires_at = datetime.fromisoformat(expires_at_str) if expires_at_str else None
+            
+            if not all([state, created_at, updated_at]):
+                raise ValueError("Missing required state metadata")
+                
             return state, created_at, updated_at, expires_at
+            
         except (KeyError, ValueError, AttributeError) as e:
-            logger.error(f"Invalid state metadata for key {key}: {e}")
-            raise StateValidationError(f"Invalid state metadata: {e}")
+            logger.error(f"Error parsing state metadata for key {key}: {e}")
+            raise StateCorruptedError(f"State metadata is corrupted for key '{key}'") from e
 
     async def _set_state_meta(
         self,
@@ -103,21 +116,40 @@ class RedisStorage(BaseStorage):
     ) -> None:
         """Update state metadata in Redis."""
         meta_key = self._get_key(META_PREFIX, key)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = (now + ttl) if ttl else None
         
-        pipe = self._redis.pipeline()
-        pipe.hset(meta_key, mapping={
-            'state': state,
-            'created_at': (await self._redis.hget(meta_key, 'created_at') or now.isoformat()),
-            'updated_at': now.isoformat(),
-            **({'expires_at': expires_at.isoformat()} if expires_at else {})
-        })
+        # Get existing created_at or use current time
+        created_at = await self._redis.hget(meta_key, 'created_at')
+        if not created_at:
+            created_at = now.isoformat()
         
-        if ttl:
-            pipe.expire(meta_key, int(ttl.total_seconds()))
+        # Prepare the data to set
+        data = {
+            'state': state,
+            'created_at': created_at,
+            'updated_at': now.isoformat(),
+        }
+        
+        if expires_at:
+            data['expires_at'] = expires_at.isoformat()
+        
+        # Get the pipeline and execute commands
+        pipe = await self._redis.pipeline()
+        
+        try:
+            # Queue up the commands
+            pipe.hset(meta_key, mapping=data)
             
-        await pipe.execute()
+            # Set TTL if provided
+            if ttl:
+                pipe.expire(meta_key, int(ttl.total_seconds()))
+            
+            # Execute the pipeline
+            await pipe.execute()
+        finally:
+            # Make sure to reset the pipeline
+            await pipe.reset()
 
     async def get_or_create_state(
         self,
@@ -175,7 +207,7 @@ class RedisStorage(BaseStorage):
             
         try:
             data_key = self._get_key(DATA_PREFIX, key)
-            pipe = self._redis.pipeline()
+            pipe = await self._redis.pipeline()
             
             if data:
                 pipe.set(data_key, json.dumps(data))
@@ -229,12 +261,22 @@ class RedisStorage(BaseStorage):
     async def finish_state(self, key: str) -> None:
         """Remove a state and its associated data."""
         try:
-            pipe = self._redis.pipeline()
-            pipe.delete(self._get_key(META_PREFIX, key))
-            pipe.delete(self._get_key(DATA_PREFIX, key))
-            await pipe.execute()
-        except RedisError as e:
-            logger.error(f"Redis error in finish_state: {e}")
+            # Get the pipeline
+            pipe = await self._redis.pipeline()
+            
+            try:
+                # Queue up the delete commands
+                pipe.delete(self._get_key(META_PREFIX, key))
+                pipe.delete(self._get_key(DATA_PREFIX, key))
+                
+                # Execute the pipeline
+                await pipe.execute()
+            finally:
+                # Make sure to reset the pipeline
+                await pipe.reset()
+                
+        except Exception as e:
+            logger.error(f"Error finishing state for key {key}: {e}")
             raise StorageError(f"Redis error: {e}") from e
 
     async def cleanup_expired(self) -> int:

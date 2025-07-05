@@ -21,8 +21,8 @@ class PatchDataPool:
     The pool is designed to be thread-safe and efficient for high-load scenarios.
     """
     
-    # Use weakref.WeakValueDictionary to avoid memory leaks from abandoned updates
-    _update_pool: Dict[int, Any] = field(default_factory=weakref.WeakValueDictionary)
+    # Use a regular dictionary since we manage cleanup ourselves
+    _update_pool: Dict[int, Any] = field(default_factory=dict)
     
     # Middleware lists
     _middlewares: List[Any] = field(default_factory=list)

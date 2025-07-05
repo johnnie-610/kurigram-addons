@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Set, Type, Union, cast
 
 import pyrogram
 from pyrogram.dispatcher import Dispatcher as PyrogramDispatcher
-from pyrogram.dispatcher.handler import Handler
+from pyrogram.handlers.handler import Handler
 from pyrogram.handlers import RawUpdateHandler
 from pyrogram.types import Update, User, Chat
 

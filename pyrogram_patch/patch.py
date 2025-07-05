@@ -4,7 +4,7 @@ from pyrogram.handlers.handler import Handler
 
 from .dispatcher import PatchedDispatcher
 from .router import Router
-from .patch_data_pool import PatchDataPool
+from .patch_data_pool import PatchDataPool, global_pool
 
 if TYPE_CHECKING:
     from .fsm.base_storage import BaseStorage
@@ -37,9 +37,9 @@ class PatchManager:
         Args:
             middleware: The middleware instance to register
         """
-        if not hasattr(PatchDataPool, 'pyrogram_patch_middlewares'):
-            PatchDataPool.pyrogram_patch_middlewares = []
-        PatchDataPool.pyrogram_patch_middlewares.append(middleware)
+        # Use the global pool instance to add middleware
+        with global_pool._lock:
+            global_pool._middlewares.append(middleware)
         
     def include_outer_middleware(self, middleware: MiddlewareT) -> None:
         """Register an outer middleware that runs before regular middlewares.
@@ -47,9 +47,9 @@ class PatchManager:
         Args:
             middleware: The middleware instance to register
         """
-        if not hasattr(PatchDataPool, 'pyrogram_patch_outer_middlewares'):
-            PatchDataPool.pyrogram_patch_outer_middlewares = []
-        PatchDataPool.pyrogram_patch_outer_middlewares.append(middleware)
+        # Use the global pool instance to add outer middleware
+        with global_pool._lock:
+            global_pool._outer_middlewares.append(middleware)
         
     def set_storage(self, storage: 'BaseStorage') -> None:
         """Set the storage backend for FSM (Finite State Machine).
@@ -57,7 +57,9 @@ class PatchManager:
         Args:
             storage: The storage implementation to use
         """
-        PatchDataPool.pyrogram_patch_fsm_storage = storage
+        # Use the global pool instance to set FSM storage
+        with global_pool._lock:
+            global_pool._fsm_storage = storage
         
     def include_router(self, router: Router) -> None:
         """Register a router with the client.

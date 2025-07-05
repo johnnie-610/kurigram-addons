@@ -1,29 +1,22 @@
 # Pyrogram Patch Documentation
 
 ## Table of Contents
+
 1. [Introduction](#introduction)
-2. [Installation](#installation)
-3. [Basic Usage](#basic-usage)
-4. [Middleware System](#middleware-system)
-5. [Finite State Machine (FSM)](#finite-state-machine-fsm)
-6. [Storage Backends](#storage-backends)
+2. [Basic Usage](#basic-usage)
+3. [Middleware System](#middleware-system)
+4. [Finite State Machine (FSM)](#finite-state-machine-fsm)
+5. [Storage Backends](#storage-backends)
    - [Built-in Storage Options](#built-in-storage-options)
    - [Creating Custom Storage](#creating-custom-storage)
    - [Storage Methods Reference](#storage-methods-reference)
-7. [Router System](#router-system)
-8. [Smart Plugins Integration](#smart-plugins-integration)
-9. [Advanced Usage](#advanced-usage)
-10. [Best Practices](#best-practices)
+6. [Router System](#router-system)
+7. [Smart Plugins Integration](#smart-plugins-integration)
+8. [Best Practices](#best-practices)
 
 ## Introduction
 
 Pyrogram Patch extends Pyrogram with powerful features like middleware support, Finite State Machine (FSM), and a router system, making it easier to build complex Telegram bots with better code organization and state management.
-
-## Installation
-
-```bash
-pip install pyrogram-patch
-```
 
 ## Basic Usage
 
@@ -62,25 +55,250 @@ if __name__ == "__main__":
 
 ## Middleware System
 
-### Creating Middleware
+### MiddlewareManager
+
+The `MiddlewareManager` class is responsible for registering and executing middlewares for Pyrogram handlers. It provides a flexible way to intercept and process updates before they reach your handlers.
+
+#### Key Features
+
+- Register middlewares for specific handler types
+- Execute middlewares in the order they were registered
+- Support for both synchronous and asynchronous middlewares
+- Type-safe middleware registration
+
+#### Basic Usage:
 
 ```python
-from pyrogram_patch.middlewares.middleware_types import OnMessageMiddleware
-from pyrogram_patch.patch_helper import PatchHelper
+from pyrogram import Client, filters
+from pyrogram.handlers import MessageHandler
+from pyrogram_patch.middlewares.middleware_manager import MiddlewareManager
+from pyrogram_patch.middlewares.middleware_types.middlewares import BaseMiddleware
 
-class LoggingMiddleware(OnMessageMiddleware):
-    async def __call__(self, update, client, patch_helper: PatchHelper):
-        # Add user info to handler data
-        patch_helper.data["user_name"] = update.from_user.first_name
-        print(f"Message from {update.from_user.first_name}: {update.text}")
+# Create a custom middleware
+class LoggingMiddleware(BaseMiddleware):
+    async def __call__(self, update, client, patch_helper):
+        print(f"Processing update: {update.id}")
+        # Call the next middleware/handler
+        return await self.next(update, client, patch_helper)
 
-# Register the middleware
-patch_manager.include_middleware(LoggingMiddleware())
+# Initialize the middleware manager
+middleware_manager = MiddlewareManager()
+
+# Register the middleware for MessageHandler
+middleware_manager.register(MessageHandler, LoggingMiddleware())
+
+# Create your Pyrogram client
+app = Client("my_bot")
+
+# Apply the middleware manager to your handlers
+@app.on_message(filters.command("start"))
+async def start(client, message):
+    await message.reply("Hello! This is a command with middleware support.")
+
+# Or apply globally to all handlers
+app.add_handler(MessageHandler(start), middleware_manager=middleware_manager)
+```
+
+#### Advanced Usage:
+
+```python
+# Multiple middlewares are executed in the order they are registered
+class AuthMiddleware(BaseMiddleware):
+    def __init__(self, allowed_users: list):
+        self.allowed_users = allowed_users
+        
+    async def __call__(self, update, client, patch_helper):
+        user_id = update.from_user.id
+        if user_id not in self.allowed_users:
+            await update.reply("Unauthorized access!")
+            return None  # Stop further processing
+        return await self.next(update, client, patch_helper)
+
+# Register multiple middlewares
+middleware_manager.register(MessageHandler, LoggingMiddleware())
+middleware_manager.register(MessageHandler, AuthMiddleware(allowed_users=[12345678]))
 ```
 
 ## Finite State Machine (FSM)
 
+The Finite State Machine (FSM) provides a structured way to manage conversation flows and states in your Telegram bot.
+
+### FSMContext
+
+The `FSMContext` class provides a convenient way to manage conversation states and associated data in your Pyrogram application.
+
+#### Key Features
+
+- State management with expiration
+- Thread-safe operations
+- Support for both sync and async storage backends
+- Automatic state cleanup
+
 ### State Management
+
+#### Defining States
+
+```python
+from pyrogram_patch.fsm import StatesGroup, StateItem, State
+from pyrogram_patch.fsm.filter import StateFilter
+
+class Registration(StatesGroup):
+    waiting_for_name = StateItem()
+    waiting_for_age = StateItem()
+    waiting_for_email = StateItem()
+```
+
+#### State Transitions with FSMContext
+
+```python
+from pyrogram import filters
+from pyrogram_patch.fsm.context import FSMContext
+
+# Initialize FSM with a storage backend
+storage = MemoryStorage()  # or RedisStorage, MongoStorage, etc.
+fsm = FSMContext(storage)
+
+@app.on_message(filters.command("register") & filters.private)
+async def start_registration(client, message, state: State):
+    await fsm.set_state(message, Registration.waiting_for_name)
+    await message.reply("Welcome! Please enter your name:")
+
+# Handle state transitions
+@app.on_message(StateFilter(Registration.waiting_for_name) & filters.private)
+async def process_name(client, message, state: State):
+    # Store the name in state data
+    await fsm.update_data(message, {"name": message.text})
+    await fsm.set_state(message, Registration.waiting_for_age)
+    await message.reply(f"Nice to meet you, {message.text}! How old are you?")
+
+@app.on_message(StateFilter(Registration.waiting_for_age) & filters.private)
+async def process_age(client, message, state: State):
+    try:
+        age = int(message.text)
+        await fsm.update_data(message, {"age": age})
+        data = await fsm.get_data(message)
+        await message.reply(
+            f"Got it, {data['name']}! "
+            f"You are {age} years old."
+        )
+        await fsm.finish_state(message)  # Clear the state
+    except ValueError:
+        await message.reply("Please enter a valid age!")
+```
+
+#### Advanced State Management:
+
+```python
+# Set state with expiration (in seconds)
+await fsm.set_state(message, "some_state", expires_in=3600)  # Expires in 1 hour
+
+# Get all states (admin only)
+if message.from_user.id == ADMIN_ID:
+    states = await fsm.get_all_states()
+    await message.reply(f"Active states: {len(states)}")
+
+# Find states by state value
+async for key, state in fsm.find_states("waiting_for_name"):
+    print(f"User {key} is waiting to provide their name")
+
+# Clear all states (use with caution!)
+if message.from_user.id == ADMIN_ID and "clear_all" in message.text:
+    await fsm.clear_all_states()
+    await message.reply("All states have been cleared!")
+```
+
+#### Handling State Transitions
+
+```python
+@app.on_message(filters.command("register") & filters.private)
+async def start_registration(client, message, state: State):
+    await state.set_state(Registration.waiting_for_name)
+    await message.reply("Please enter your name:")
+
+@app.on_message(filters.private & StateFilter(Registration.waiting_for_name))
+async def process_name(client, message, state: State):
+    await state.set_data({"name": message.text})
+    await state.set_state(Registration.waiting_for_age)
+    await message.reply(f"Thanks, {message.text}! Now, how old are you?")
+
+@app.on_message(filters.private & StateFilter(Registration.waiting_for_age))
+async def process_age(client, message, state: State):
+    try:
+        age = int(message.text)
+        if age < 13:
+            await message.reply("Sorry, you must be at least 13 years old to register.")
+            await state.finish()
+            return
+            
+        # Update state data
+        await state.update_data({"age": age})
+        await state.set_state(Registration.waiting_for_email)
+        await message.reply("Great! Now, what's your email address?")
+    except ValueError:
+        await message.reply("Please enter a valid age (numbers only).")
+
+@app.on_message(filters.private & StateFilter(Registration.waiting_for_email))
+async def process_email(client, message, state: State):
+    email = message.text.strip()
+    if "@" not in email or "." not in email:
+        await message.reply("Please enter a valid email address.")
+        return
+        
+    # Get all collected data
+    data = await state.get_data()
+    data["email"] = email
+    
+    # Process the registration (e.g., save to database)
+    # await save_registration(data)
+    
+    # Send confirmation and finish the state
+    await message.reply(
+        "Registration complete!\n\n"
+        f"Name: {data['name']}\n"
+        f"Age: {data['age']}\n"
+        f"Email: {email}"
+    )
+    
+    # Clear the state
+    await state.finish()
+```
+
+#### State Timeouts
+
+You can set timeouts for states to automatically expire:
+
+```python
+# Set a 5-minute timeout for the current state
+await state.set_state(Registration.waiting_for_email, timeout=300)
+
+# Check if state has timed out
+if await state.is_expired():
+    await message.reply("Session expired. Please start over with /register")
+    await state.finish()
+    return
+```
+
+#### State Data Management
+
+```python
+# Set data
+await state.set_data({"key1": "value1", "key2": "value2"})
+
+# Update specific fields
+await state.update_data({"key2": "new_value"})
+
+# Get all data
+data = await state.get_data()
+
+# Get specific field
+value = await state.get_data("key1")
+
+# Delete specific field
+await state.delete_data("key1")
+
+# Clear all data
+await state.clear_data()
+```
 
 ```python
 @app.on_message(filters.command("register") & filters.private)
@@ -132,44 +350,46 @@ patch_manager.include_router(admin_router)
 
 ### Using with Pyrogram's Smart Plugins
 
-1. **Create a plugin file** (e.g., `plugins/admin_commands.py`):
+Here's a basic example of how to create and use a plugin:
 
-```python
-# plugins/admin_commands.py
-from pyrogram import filters
-from pyrogram_patch.router import Router
+1. **Create a plugin file** (`plugins/example.py`):
 
-router = Router()
+   ```python
+   # plugins/example.py
+   from pyrogram import filters
+   from pyrogram_patch.router import Router
+   
+   router = Router()
+   
+   @router.on_message(filters.command("ping") & filters.private)
+   async def ping(client, message):
+       await message.reply("Pong!")
+   
+   @router.on_message(filters.command("echo") & filters.private)
+   async def echo(client, message):
+       if len(message.command) > 1:
+           await message.reply(" ".join(message.command[1:]))
+       else:
+           await message.reply("Please provide some text to echo!")
+   ```
 
-@router.on_message(filters.command("ping") & filters.private)
-async def ping(client, message):
-    await message.reply("Pong!")
+2. **Load the plugin in your main bot file** (`main.py`):
 
-@router.on_message(filters.command("echo") & filters.private)
-async def echo(client, message):
-    if len(message.command) > 1:
-        await message.reply(" ".join(message.command[1:]))
-    else:
-        await message.reply("Please provide some text to echo!")
-```
-
-2. **Load the plugin in your main bot file**:
-
-```python
-# main.py
-from pyrogram import Client, filters
-from pyrogram_patch import patch
-
-app = Client("my_bot")
-patch_manager = patch(app)
-
-# Load plugins
-app.load_plugins("plugins")
-
-# Run the bot
-if __name__ == "__main__":
-    app.run()
-```
+   ```python
+   # main.py
+   from pyrogram import Client, filters
+   from pyrogram_patch import patch
+   
+   app = Client("my_bot")
+   patch_manager = patch(app)
+   
+   # Load plugins
+   app.load_plugins("plugins")
+   
+   # Run the bot
+   if __name__ == "__main__":
+       app.run()
+   ```
 
 ### Plugin with FSM
 
@@ -197,6 +417,7 @@ async def process_feedback(client, message, state: State):
     await state.set_state(Survey.waiting_for_rating)
     await message.reply("Thank you! Now please rate our service from 1 to 5:")
 
+
 @router.on_message(StateFilter(Survey.waiting_for_rating) & filters.private)
 async def process_rating(client, message, state: State):
     if message.text.isdigit() and 1 <= int(message.text) <= 5:
@@ -211,72 +432,276 @@ async def process_rating(client, message, state: State):
         await message.reply("Please enter a number between 1 and 5.")
 ```
 
-## Advanced Usage
-
-### Custom Storage Backend
-
-```python
-from typing import Dict, Optional
-from pyrogram_patch.fsm import BaseStorage
-
-class CustomStorage(BaseStorage):
-    def __init__(self):
-        self._storage: Dict[str, dict] = {}
-    
-    async def get_state(self, key: str) -> Optional[str]:
-        return self._storage.get(key, {}).get("state")
-    
-    async def set_state(self, key: str, state: str) -> None:
-        if key not in self._storage:
-            self._storage[key] = {}
-        self._storage[key]["state"] = state
-    
-    async def get_data(self, key: str) -> dict:
-        return self._storage.get(key, {}).get("data", {})
-    
-    async def set_data(self, data: dict, key: str) -> None:
-        if key not in self._storage:
-            self._storage[key] = {}
-        self._storage[key]["data"] = data
-    
-    async def finish_state(self, key: str) -> None:
-        self._storage.pop(key, None)
-
-# Usage
-storage = CustomStorage()
-patch_manager.set_storage(storage)
-```
-
 ## Storage Backends
 
-Pyrogram Patch provides a flexible storage system for managing FSM states. The `CustomStorage` class serves as a base for creating your own storage backends, with built-in thread safety and common functionality.
+Pyrogram Patch provides a flexible and extensible storage system for managing FSM states. The storage system is designed to be thread-safe and supports various backends out of the box, with the ability to create custom storage implementations.
 
 ### Built-in Storage Options
 
-The library includes several storage implementations:
+#### 1. MemoryStorage
 
-- `MemoryStorage`: In-memory storage (not persistent, for development only)
-- `MongoStorage`: MongoDB-based storage
-- `RedisStorage`: Redis-based storage
-
-Example using built-in storage:
+- **Type**: In-memory storage (not persistent)
+- **Use Case**: Development, testing, or single-process applications
+- **Thread Safety**: Yes (thread-safe implementation)
+- **Persistence**: Data is lost on application restart
 
 ```python
-from pyrogram_patch.fsm.storages import MemoryStorage, MongoStorage, RedisStorage
+from pyrogram_patch.fsm.storages import MemoryStorage
 
-# Simple in-memory storage (not persistent)
-storage = MemoryStorage()
+# Initialize with optional TTL (in seconds)
+storage = MemoryStorage(ttl=3600)  # Data expires after 1 hour
 
-# MongoDB storage
-mongo_storage = MongoStorage("mongodb://localhost:27017/", "my_database")
+# Disable TTL (data won't expire)
+storage_no_ttl = MemoryStorage()
+```
 
-# Redis storage
-redis_storage = RedisStorage("redis://localhost:6379/0")
+#### 2. RedisStorage
+
+RedisStorage is a production-ready backend that stores state data in a Redis database. It's ideal for:
+
+- Multi-process/multi-instance bot deployments
+- High-availability requirements
+- Distributed systems
+- Persistent state across restarts
+
+**Features:**
+
+- Connection pooling for better performance
+- Configurable key prefixing
+- Support for Redis Sentinel and Cluster
+- Automatic reconnection on connection loss
+- Configurable timeouts and retries
+- Thread-safe operations
+
+**Dependencies:**
+
+```bash
+pip install redis>=4.0.0
+```
+
+**Configuration Options:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `host` | str | 'localhost' | Redis server hostname |
+| `port` | int | 6379 | Redis server port |
+| `db` | int | 0 | Database number (0-15) |
+| `password` | str | None | Authentication password |
+| `socket_timeout` | int | 5 | Socket timeout in seconds |
+| `socket_connect_timeout` | int | 5 | Connection timeout in seconds |
+| `max_connections` | int | 10 | Max connections in pool |
+| `ttl` | int | 86400 | Default TTL in seconds |
+| `prefix` | str | 'pyrogram_patch:' | Key prefix |
+| `retry_on_timeout` | bool | False | Retry on connection timeout |
+| `ssl` | bool | False | Use SSL for connection |
+| `ssl_cert_reqs` | str | 'required' | SSL certificate requirements |
+| `health_check_interval` | int | 0 | Health check interval in seconds |
+
+**Example with Sentinel:**
+
+```python
+from redis.sentinel import Sentinel
+
+sentinel = Sentinel([
+    ('sentinel1.example.com', 26379),
+    ('sentinel2.example.com', 26379)
+], socket_timeout=0.5)
+
+master = sentinel.master_for('mymaster', socket_timeout=0.5)
+storage = RedisStorage(connection_pool=master.connection_pool)
+```
+
+- **Type**: Persistent storage using Redis
+- **Use Case**: Production, distributed applications, multi-process environments
+- **Dependencies**: `redis` package (`pip install redis`)
+- **Persistence**: Yes (depends on Redis configuration)
+
+```python
+from pyrogram_patch.fsm.storages import RedisStorage
+
+### Connection Options
+
+```python
+from pyrogram_patch.fsm.storages import RedisStorage
+
+# Basic connection with minimal options
+storage = RedisStorage(
+    host='localhost',    # Redis server host
+    port=6379,           # Redis server port
+    db=0,                # Database number (0-15)
+    password=None,       # Optional password for authentication
+    ttl=86400,           # Default TTL in seconds (24 hours)
+    prefix='fsm:'        # Prefix for all Redis keys
+)
+
+# Advanced connection with connection pooling
+storage = RedisStorage(
+    host='localhost',
+    port=6379,
+    db=0,
+    password='your_secure_password',
+    socket_timeout=5,           # Connection timeout in seconds
+    socket_connect_timeout=5,   # Socket connect timeout
+    retry_on_timeout=True,      # Retry on connection timeout
+    max_connections=10,         # Maximum number of connections in pool
+    ttl=86400,                 # Default TTL in seconds
+    prefix='my_bot:fsm:'       # Namespaced keys
+)
+
+# Using Redis URL format
+redis_url = 'redis://username:password@localhost:6379/0'
+storage = RedisStorage.from_url(
+    redis_url,
+    ttl=3600,  # 1 hour TTL
+    prefix='bot:fsm:'
+)
+
+# Connection with connection pool
+storage_with_pool = RedisStorage(
+    host='localhost',
+    port=6379,
+    db=0,
+    password='your_redis_password',
+    ttl=3600,
+    max_connections=10  # Connection pool size
+)
+
+# Connect to Redis cluster
+# Requires redis-py-cluster package
+from redis.cluster import RedisCluster
+
+cluster = RedisCluster(
+    startup_nodes=[{"host": "localhost", "port": "7000"}],
+    decode_responses=True
+)
+storage_cluster = RedisStorage(redis=cluster)
 ```
 
 ### Creating Custom Storage
 
-To create a custom storage backend, subclass `CustomStorage` and implement the required methods. Here's a minimal example:
+You can create your own storage backend by subclassing `CustomStorage` and implementing the required methods. Here's a complete example:
+
+```python
+from typing import Dict, Any, Optional, AsyncIterator
+from datetime import datetime, timedelta, timezone
+from pyrogram_patch.fsm.storages import CustomStorage
+from pyrogram_patch.fsm.base_storage import StateData, StateNotFoundError
+
+class MyCustomStorage(CustomStorage):
+    """
+    Example implementation of a custom storage backend.
+    This example uses an in-memory dictionary, but you can replace it with any storage system.
+    """
+    def __init__(self, ttl: int = 3600):
+        super().__init__()
+        self._storage: Dict[str, Dict[str, Any]] = {}
+        self._ttl = ttl
+    
+    async def get_state_data(self, key: str) -> StateData:
+        """Retrieve state data for a given key."""
+        if key not in self._storage:
+            raise StateNotFoundError(f"State not found: {key}")
+            
+        data = self._storage[key]
+        
+        # Check if data has expired
+        if "expires_at" in data and data["expires_at"] < datetime.now(timezone.utc):
+            await self.delete_state(key)
+            raise StateNotFoundError(f"State expired: {key}")
+            
+        return StateData(**data)
+    
+    async def set_state_data(self, key: str, state_data: StateData) -> None:
+        """Store state data for a given key."""
+        data = state_data.dict()
+        
+        # Add TTL if specified
+        if self._ttl > 0:
+            data["expires_at"] = datetime.now(timezone.utc) + timedelta(seconds=self._ttl)
+            
+        self._storage[key] = data
+    
+    async def delete_state(self, key: str) -> None:
+        """Delete state data for a given key."""
+        self._storage.pop(key, None)
+    
+    async def has_state(self, key: str) -> bool:
+        """Check if a state exists for the given key."""
+        return key in self._storage
+    
+    async def get_all_states(self) -> Dict[str, StateData]:
+        """Retrieve all states."""
+        return {k: StateData(**v) for k, v in self._storage.items()}
+    
+    async def clear_all_states(self) -> None:
+        """Clear all stored states."""
+        self._storage.clear()
+    
+    async def find_states(self, state: str) -> AsyncIterator[tuple[str, StateData]]:
+        """Find all states with the given state value."""
+        for key, data in self._storage.items():
+            if data.get("state") == state:
+                yield key, StateData(**data)
+    
+    async def cleanup_expired(self) -> int:
+        """Remove all expired states and return count of removed items."""
+        now = datetime.now(timezone.utc)
+        expired = []
+        
+        for key, data in self._storage.items():
+            if "expires_at" in data and data["expires_at"] < now:
+                expired.append(key)
+                
+        for key in expired:
+            del self._storage[key]
+            
+        return len(expired)
+```
+
+### Storage Best Practices
+
+1. **Thread Safety**
+
+   - Ensure your storage implementation is thread-safe, especially if using shared resources
+   - Use locks or atomic operations for concurrent access
+   - Consider using connection pools for database connections
+
+2. **Error Handling**
+
+   - Implement proper error handling for storage operations
+   - Handle connection errors gracefully
+   - Implement retries for transient failures
+   - Log errors with appropriate context
+
+3. **Connection Management**
+
+   - Use connection pooling for database connections
+   - Implement proper connection cleanup
+   - Handle connection timeouts and retries
+
+4. **TTL Support**
+
+   - Implement automatic cleanup of expired states
+   - Consider background cleanup tasks for large datasets
+   - Document TTL behavior in your implementation
+
+5. **Data Validation**
+
+   - Validate data before storing to maintain consistency
+   - Use proper serialization/deserialization
+   - Handle schema migrations if needed
+
+6. **Performance Considerations**
+
+   - Use batch operations when possible
+   - Implement efficient querying for large datasets
+   - Consider caching frequently accessed data
+
+7. **Monitoring and Logging**
+
+   - Log important operations and errors
+   - Add metrics for monitoring storage performance
+   - Include context in error messages for easier debugging
 
 ```python
 from typing import Dict, Any, Optional, AsyncIterator
@@ -404,13 +829,16 @@ For a complete example, see the built-in storage implementations in the `pyrogra
 
 Let's break down each best practice with simple explanations and examples to help you understand why they're important and how to implement them.
 
-### 1. Organize Your Code with Routers and Plugins
+## Organize Your Code with Routers and Plugins
+
 **Why?** As your bot grows, having all your code in one file becomes messy and hard to maintain.
 
 **How to do it:**
+
 - Group related commands in separate router files
 - Use Pyrogram's plugin system to organize features
 - Example structure:
+
   ```
   my_bot/
   ├── main.py
@@ -465,12 +893,9 @@ async def divide_numbers(client, message):
 ```
 
 ### 4. Use Middleware for Cross-cutting Concerns
+
 **Why?** Middleware helps you handle common tasks (like logging, authentication) in one place.
 
-**Example: Simple Logging Middleware**
-```python
-class LoggingMiddleware(OnMessageMiddleware):
-    async def __call__(self, update, client, patch_helper: PatchHelper):
         # Log before processing
         print(f"Received message: {update.text}")
         
@@ -487,9 +912,11 @@ class LoggingMiddleware(OnMessageMiddleware):
 ```
 
 ### 5. Clean Up Resources
+
 **Why?** Not cleaning up can lead to memory leaks and unexpected behavior.
 
 **Example:** Always finish FSM states when done:
+
 ```python
 @router.on_message(StateFilter(SomeState.some_state) & filters.private)
 async def handle_state(client, message, state: State):
@@ -508,9 +935,11 @@ async def handle_state(client, message, state: State):
 ```
 
 ### 6. Use Type Hints
+
 **Why?** Type hints make your code more readable and help catch errors early.
 
 **Example:**
+
 ```python
 # ❌ Hard to understand what types are expected
 def process_user(data):
@@ -530,9 +959,11 @@ def process_user(data: dict) -> str:
 ```
 
 ### 7. Keep Handlers Focused
+
 **Why?** Each handler should do one thing well. This makes your code easier to test and maintain.
 
 **Example:**
+
 ```python
 # ❌ One handler doing too much
 @router.on_message(filters.command("user"))
@@ -562,23 +993,27 @@ async def update_user_info(client, message):
 ```
 
 ### 8. Use Environment Variables for Sensitive Data
+
 **Why?** Never hardcode sensitive information like API keys in your code.
 
 **Example using python-dotenv:**
 
 1. Install the package:
+
 ```bash
 pip install python-dotenv
 ```
 
 2. Create a `.env` file (add it to .gitignore!):
-```
+
+```env
 API_ID=1234567
 API_HASH=your_api_hash_here
 BOT_TOKEN=your_bot_token_here
 ```
 
-3. In your code:
+{{ ... }}
+
 ```python
 import os
 from dotenv import load_dotenv
@@ -607,10 +1042,9 @@ Now that you understand the basics, here's how to continue learning:
 ## Getting Help
 
 If you get stuck:
-1. Check the [Pyrogram Documentation](https://docs.pyrogram.org/)
-2. Search for similar issues on [GitHub](https://github.com/pyrogram/pyrogram)
-3. Ask questions on [Stack Overflow](https://stackoverflow.com/) with the `pyrogram` tag
-4. Join the [Pyrogram Telegram Group](https://t.me/pyrogram)
+
+1. Check the [Kurigram Documentation](https://docs.kurigram.live/)
+2. Join the [Telegram Group](https://t.me/kurigram_addons_chat)
 
 ## Final Thoughts
 
