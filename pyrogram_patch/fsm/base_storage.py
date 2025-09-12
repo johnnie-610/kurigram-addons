@@ -1,246 +1,149 @@
-from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, TypeVar, AsyncIterator, Generic, Type
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+# pyrogram_patch/fsm/base_storage.py
+from __future__ import annotations
 
-# Type variables for generic return types
-T = TypeVar('T')
-StateT = TypeVar('StateT', bound='State')
+import abc
+from typing import Any, Dict, Optional, Protocol
+
+from pyrogram_patch import errors
 
 
-@dataclass(frozen=True)
-class StateData:
-    """Container for state-related data.
-    
-    Attributes:
-        state: The current state identifier.
-        data: Dictionary containing arbitrary state data.
-        created_at: When the state was first created.
-        updated_at: When the state was last modified.
-        expires_at: When the state should expire (optional).
+class BaseStorage(abc.ABC):
+    """Abstract base class / interface for FSM storage backends.
+
+    Implementations must be fully asynchronous and follow the method
+    semantics described here. This interface is intentionally small and
+    maps directly to the operations required by FSMContext.
+
+    Implementations should not perform long blocking work inside methods;
+    use async IO primitives instead.
+
+    Methods:
+        set_state(identifier, state, ttl=None)
+        get_state(identifier)
+        delete_state(identifier)
+        compare_and_set(identifier, new_state, expected_state=None, ttl=None)
+        list_keys(pattern="*")
+        clear_namespace()
+        start() (optional)
+        stop() (optional)
     """
-    state: str
-    data: Dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
-    expires_at: Optional[datetime] = None
 
-    @property
-    def is_expired(self) -> bool:
-        """Check if the state has expired."""
-        if self.expires_at is None:
-            return False
-        return datetime.utcnow() >= self.expires_at
+    # ---- lifecycle (optional) -----------------------------------------
+    async def start(self) -> None:
+        """Optional startup hook. Backends may open connections or start background tasks."""
+        return None
+
+    async def stop(self) -> None:
+        """Optional shutdown hook. Backends should cleanup and stop background tasks."""
+        return None
+
+    # ---- core API -----------------------------------------------------
+    @abc.abstractmethod
+    async def set_state(self, identifier: str, state: Dict[str, Any], *, ttl: Optional[int] = None) -> None:
+        """Persist the state for `identifier`.
+
+        Args:
+            identifier: unique key (e.g. 'chat:123' or 'user:456').
+            state: JSON-serialisable mapping describing state, e.g. {'name': 'awaiting', 'data': {...}}.
+            ttl: optional TTL in seconds (0 or None => no expiry).
+
+        Raises:
+            errors.PyrogramPatchError (or subclass) on failure.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def get_state(self, identifier: str) -> Optional[Dict[str, Any]]:
+        """Return the stored state dict for `identifier` or None if absent.
+
+        Raises:
+            errors.PyrogramPatchError on failure.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def delete_state(self, identifier: str) -> bool:
+        """Remove the state for `identifier`. Return True if a key was removed.
+
+        Raises:
+            errors.PyrogramPatchError on failure.
+        """
+        raise NotImplementedError
 
 
-class StorageError(Exception):
-    """Base exception for storage-related errors."""
-    pass
-
-
-class StateNotFoundError(StorageError):
-    """Raised when a requested state is not found in storage."""
-    pass
-
-
-class StateValidationError(StorageError):
-    """Raised when state data fails validation."""
-    pass
-
-
-class BaseStorage(ABC):
-    """Abstract base class for state storage backends.
-    
-    Implementations must be thread-safe and support concurrent access.
-    """
-    
-    # Maximum allowed size for state data in bytes
-    MAX_DATA_SIZE: int = 1024 * 1024  # 1MB
-    
-    # Default TTL for states (None means no expiration)
-    DEFAULT_TTL: Optional[timedelta] = timedelta(days=1)
-
-    @abstractmethod
-    async def get_or_create_state(
+    @abc.abstractmethod
+    async def compare_and_set(
         self,
-        key: str,
-        default_state: Optional[str] = None,
-        ttl: Optional[timedelta] = None
-    ) -> StateT:
-        """Get an existing state or create a new one if it doesn't exist.
-        
+        identifier: str,
+        new_state: Dict[str, Any],
+        *,
+        expected_state: Optional[Dict[str, Any]] = None,
+        ttl: Optional[int] = None,
+    ) -> bool:
+        """Atomically set `new_state` only if the current value equals `expected_state`.
+
         Args:
-            key: Unique identifier for the state.
-            default_state: Initial state if creating a new state.
-            ttl: Time-to-live for the state. Uses DEFAULT_TTL if None.
-                
+            identifier: key.
+            new_state: mapping to set.
+            expected_state: mapping expected to currently be present (None means absent).
+            ttl: optional TTL override.
+
         Returns:
-            State: The existing or newly created state.
-            
+            True if the new_state was set (condition matched), False otherwise.
+
         Raises:
-            StateValidationError: If the key or state is invalid.
-            StorageError: For any storage-related errors.
+            errors.PyrogramPatchError on backend failures.
         """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def list_keys(self, pattern: str = "*") -> list[str]:
+        """Return a list of identifiers stored (pattern matching left to backend).
+
+        Note:
+            Patterns and scanning semantics depend on the backend. For Redis-like backends,
+            pattern is applied to keys after the namespace/prefix. Backends should document behavior.
+
+        Raises:
+            errors.PyrogramPatchError on failure.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def clear_namespace(self) -> int:
+        """Delete all keys in this storage's namespace and return the number deleted.
+
+        Raises:
+            errors.PyrogramPatchError on failure.
+        """
+        raise NotImplementedError
+
+
+# Optional: a Protocol for duck-typing (useful in tests)
+class BaseStorageProtocol(Protocol):
+    """Protocol describing the async storage shape for static typing."""
+
+    async def set_state(self, identifier: str, state: Dict[str, Any], *, ttl: Optional[int] = None) -> None:
         ...
 
-    @abstractmethod
-    async def set_state(
+    async def get_state(self, identifier: str) -> Optional[Dict[str, Any]]:
+        ...
+
+    async def delete_state(self, identifier: str) -> bool:
+        ...
+
+    async def compare_and_set(
         self,
-        state: str,
-        key: str,
-        ttl: Optional[timedelta] = None
-    ) -> None:
-        """Update the state for a given key.
-        
-        Args:
-            state: The new state to set.
-            key: The key identifying the state to update.
-            ttl: Optional time-to-live for the state.
-                
-        Raises:
-            StateNotFoundError: If the state doesn't exist.
-            StateValidationError: If the state is invalid.
-            StorageError: For any storage-related errors.
-        """
+        identifier: str,
+        new_state: Dict[str, Any],
+        *,
+        expected_state: Optional[Dict[str, Any]] = None,
+        ttl: Optional[int] = None,
+    ) -> bool:
         ...
 
-    @abstractmethod
-    async def set_data(
-        self,
-        data: Dict[str, Any],
-        key: str,
-        ttl: Optional[timedelta] = None
-    ) -> None:
-        """Update the data for a given state.
-        
-        Args:
-            data: Dictionary of data to store.
-            key: The key identifying the state to update.
-            ttl: Optional time-to-live for the state.
-                
-        Raises:
-            StateNotFoundError: If the state doesn't exist.
-            StateValidationError: If the data is too large or invalid.
-            StorageError: For any storage-related errors.
-        """
+    async def list_keys(self, pattern: str = "*") -> list[str]:
         ...
 
-    @abstractmethod
-    async def get_data(self, key: str) -> Dict[str, Any]:
-        """Retrieve the data for a given state.
-        
-        Args:
-            key: The key identifying the state.
-                
-        Returns:
-            dict: The stored data, or an empty dict if no data exists.
-            
-        Raises:
-            StateNotFoundError: If the state doesn't exist.
-            StorageError: For any storage-related errors.
-        """
+    async def clear_namespace(self) -> int:
         ...
-
-    @abstractmethod
-    async def get_state_data(self, key: str) -> StateData:
-        """Retrieve complete state information including metadata.
-        
-        Args:
-            key: The key identifying the state.
-                
-        Returns:
-            StateData: Complete state information.
-            
-        Raises:
-            StateNotFoundError: If the state doesn't exist.
-            StorageError: For any storage-related errors.
-        """
-        ...
-
-    @abstractmethod
-    async def finish_state(self, key: str) -> None:
-        """Remove a state and its associated data.
-        
-        Args:
-            key: The key identifying the state to remove.
-                
-        Raises:
-            StateNotFoundError: If the state doesn't exist.
-            StorageError: For any storage-related errors.
-        """
-        ...
-
-    @abstractmethod
-    async def cleanup_expired(self) -> int:
-        """Remove all expired states.
-        
-        Returns:
-            int: Number of states removed.
-            
-        Raises:
-            StorageError: For any storage-related errors.
-        """
-        ...
-
-    @abstractmethod
-    async def list_states(
-        self,
-        state: Optional[str] = None,
-        created_before: Optional[datetime] = None
-    ) -> AsyncIterator[str]:
-        """List all state keys matching the given criteria.
-        
-        Args:
-            state: If provided, only return states with this value.
-            created_before: If provided, only return states created before this time.
-            
-        Yields:
-            str: Keys of matching states.
-            
-        Raises:
-            StorageError: For any storage-related errors.
-        """
-        ...
-
-    # Helper methods with default implementations
-    
-    async def state_exists(self, key: str) -> bool:
-        """Check if a state exists.
-        
-        Args:
-            key: The key to check.
-                
-        Returns:
-            bool: True if the state exists, False otherwise.
-        """
-        try:
-            await self.get_state_data(key)
-            return True
-        except StateNotFoundError:
-            return False
-
-    async def update_ttl(
-        self,
-        key: str,
-        ttl: Optional[timedelta] = None
-    ) -> None:
-        """Update the TTL for a state.
-        
-        Args:
-            key: The key identifying the state.
-            ttl: New TTL value. If None, uses the default TTL.
-                
-        Raises:
-            StateNotFoundError: If the state doesn't exist.
-            StorageError: For any storage-related errors.
-        """
-        state_data = await self.get_state_data(key)
-        if ttl is None:
-            ttl = self.DEFAULT_TTL
-            
-        if ttl is not None:
-            await self.set_state(
-                state=state_data.state,
-                key=key,
-                ttl=ttl
-            )

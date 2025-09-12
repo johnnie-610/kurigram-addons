@@ -1,4 +1,4 @@
-from .memory_storage import MemoryStorage
-from .redis_storage import RedisStorage
+from pyrogram_patch.fsm.storages.memory_storage import MemoryStorage
+from pyrogram_patch.fsm.storages.redis_storage import RedisStorage
 
 __all__ = ["MemoryStorage", "RedisStorage"]

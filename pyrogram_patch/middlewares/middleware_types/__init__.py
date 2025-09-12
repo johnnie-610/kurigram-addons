@@ -1,4 +1,3 @@
-from . import middlewares
 from .middlewares import *
 
 __all__ = [

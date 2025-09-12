@@ -1,142 +1,182 @@
-from typing import Type, Any, Tuple, TypeVar
-from pyrogram.handlers import (
-    CallbackQueryHandler,
-    ChatJoinRequestHandler,
-    ChatMemberUpdatedHandler,
-    ChosenInlineResultHandler,
-    DeletedMessagesHandler,
-    DisconnectHandler,
-    EditedMessageHandler,
-    InlineQueryHandler,
-    MessageHandler,
-    PollHandler,
-    RawUpdateHandler,
-    UserStatusHandler,
-)
-from pyrogram.handlers.handler import Handler
+# pyrogram_patch.middlewares.middleware_types.middlewares
+from __future__ import annotations
 
-T = TypeVar('T', bound=Handler)
+import logging
+from typing import Any, Callable, Optional
 
+from pyrogram_patch import errors
+
+logger = logging.getLogger("pyrogram_patch.middleware_types")
+
+
+# Try to import Pyrogram handler types; be resilient if Pyrogram not installed
+try:
+    from pyrogram.handlers import (
+        CallbackQueryHandler,
+        ChatJoinRequestHandler,
+        ChatMemberUpdatedHandler,
+        ChosenInlineResultHandler,
+        DeletedMessagesHandler,
+        EditedMessageHandler,
+        InlineQueryHandler,
+        MessageHandler,
+        PollHandler,
+        RawUpdateHandler,
+        UserStatusHandler,
+        BusinessConnectionHandler,
+        BusinessMessageHandler,
+        ChatBoostHandler,
+        DeletedBusinessMessagesHandler,
+        StartHandler,
+        StopHandler,
+        ConnectHandler,
+        DisconnectHandler,
+        EditedBusinessMessageHandler,
+        MessageReactionCountHandler,
+        MessageReactionHandler,
+        PreCheckoutQueryHandler,
+        PurchasedPaidMediaHandler,
+        ShippingQueryHandler,
+        StoryHandler,
+    )
+except Exception:  # pragma: no cover - optional dependency
+    CallbackQueryHandler = object
+    ChatJoinRequestHandler = object
+    ChatMemberUpdatedHandler = object
+    ChosenInlineResultHandler = object
+    DeletedMessagesHandler = object
+    EditedMessageHandler = object
+    InlineQueryHandler = object
+    MessageHandler = object
+    PollHandler = object
+    RawUpdateHandler = object
+    UserStatusHandler = object
+    BusinessConnectionHandler = object
+    BusinessMessageHandler = object
+    ChatBoostHandler = object
+    DeletedBusinessMessagesHandler = object
+    StartHandler = object
+    StopHandler = object
+    ConnectHandler = object
+    DisconnectHandler = object
+    EditedBusinessMessageHandler = object
+    MessageReactionCountHandler = object
+    MessageReactionHandler = object
+    PreCheckoutQueryHandler = object
+    PurchasedPaidMediaHandler = object
+    ShippingQueryHandler = object
+    StoryHandler = object
 
 class BaseMiddleware:
-    """Base middleware class for all Pyrogram middlewares."""
-    handler_type: Type[Handler]
-    
-    def __eq__(self, other: Any) -> bool:
-        """Check if this middleware matches a handler type.
-        
-        Args:
-            other: The handler type to compare against
-            
-        Returns:
-            bool: True if this middleware handles the given handler type
-        """
-        return other == self.handler_type
-    
-    def __hash__(self) -> int:
-        """Make the middleware hashable."""
-        return hash(self.handler_type)
+    """Lightweight facade representing middleware that targets specific Pyrogram handler types.
 
-
-class OnUpdateMiddleware(BaseMiddleware):
-    """Middleware that matches all handler types."""
-    
-    def __eq__(self, other: Any) -> bool:
-        return True
-    
-    def __hash__(self) -> int:
-        return hash('OnUpdateMiddleware')
-
-
-class OnEditedMessageMiddleware(BaseMiddleware):
-    """Middleware for handling edited message events."""
-    handler_type = EditedMessageHandler
-
-
-class OnUserStatusMiddleware(BaseMiddleware):
-    """Middleware for handling user status updates."""
-    handler_type = UserStatusHandler
-
-
-class OnRawUpdateMiddleware(BaseMiddleware):
-    """Middleware for handling raw updates."""
-    handler_type = RawUpdateHandler
-
-
-class OnChosenInlineResultMiddleware(BaseMiddleware):
-    """Middleware for handling chosen inline results."""
-    handler_type = ChosenInlineResultHandler
-
-
-class OnDeletedMessagesMiddleware(BaseMiddleware):
-    """Middleware for handling deleted messages."""
-    handler_type = DeletedMessagesHandler
-
-
-class OnChatMemberUpdatedMiddleware(BaseMiddleware):
-    """Middleware for handling chat member updates."""
-    handler_type = ChatMemberUpdatedHandler
-
-
-class OnChatJoinRequestMiddleware(BaseMiddleware):
-    """Middleware for handling chat join requests."""
-    handler_type = ChatJoinRequestHandler
-
-
-class OnCallbackQueryMiddleware(BaseMiddleware):
-    """Middleware for handling callback queries."""
-    handler_type = CallbackQueryHandler
-
-
-class OnInlineQueryMiddleware(BaseMiddleware):
-    """Middleware for handling inline queries."""
-    handler_type = InlineQueryHandler
-
-
-class OnDisconnectMiddleware(BaseMiddleware):
-    """Middleware for handling disconnection events."""
-    handler_type = DisconnectHandler
-
-
-class OnMessageMiddleware(BaseMiddleware):
-    """Middleware for handling new messages."""
-    handler_type = MessageHandler
-
-
-class OnPollMiddleware(BaseMiddleware):
-    """Middleware for handling poll updates."""
-    handler_type = PollHandler
-
-
-class MixedMiddleware:
-    """Middleware that can handle multiple handler types.
-    
-    Example:
-        patch_manager.include_middleware(CheckIgnoreMiddleware((MessageHandler, EditedMessageHandler)))
-    
-    class CheckIgnoreMiddleware(MixedMiddleware):
-        def __init__(self, handlers: Tuple[Type[Handler], ...], ignore: bool = False) -> None:
-            self.ignore = ignore  # Custom middleware-specific attribute
-            super().__init__(handlers)
+    This class is a compatibility aid: old code that registered middleware by handler classes
+    can instantiate these facades and register them as *around* middleware with the new manager.
+    The facade's `as_around()` returns an async wrapper factory suitable for `MiddlewareManager.add_around`.
     """
-    
-    def __init__(self, handlers: Tuple[Type[Handler], ...]) -> None:
-        """Initialize the mixed middleware with the specified handler types.
-        
-        Args:
-            handlers: Tuple of handler types this middleware should handle
-            
-        Raises:
-            ValueError: If no handlers are provided
-        """
-        if not handlers:
+
+    def __init__(self, *handler_types: type):
+        if not handler_types:
             raise ValueError("At least one handler type must be provided")
-        self._handlers = handlers
-    
-    def __eq__(self, other: Any) -> bool:
-        """Check if this middleware matches any of its registered handler types."""
-        return other in self._handlers
-    
-    def __hash__(self) -> int:
-        """Make the middleware hashable based on its handlers."""
-        return hash(self._handlers)
+        self._handler_types = handler_types
+
+    def matches(self, handler: Any) -> bool:
+        """Return True if a pyrogram.Handler instance/class matches any of the handler types."""
+        try:
+            # handler may be a Handler class or instance
+            htype = getattr(handler, '__class__', handler)
+            return any(issubclass(htype, t) for t in self._handler_types if isinstance(t, type))
+        except Exception:
+            return False
+
+    def as_around(self, predicate: Optional[Callable[[Any], bool]] = None):
+        """Return an `around` middleware function that wraps handlers matching the target types.
+
+        The returned function has signature: async def around(next_handler) -> wrapped_handler
+        """
+        def make_around(next_handler):
+            async def wrapped(update):
+                # Basic compatibility: do not alter update; simply call next_handler
+                await next_handler(update)
+            return wrapped
+        return make_around
+
+
+# Convenience facades for common handler groups (thin wrappers)
+def OnMessageMiddleware():
+    return BaseMiddleware(MessageHandler)
+
+def OnEditedMessageMiddleware():
+    return BaseMiddleware(EditedMessageHandler)
+
+def OnCallbackQueryMiddleware():
+    return BaseMiddleware(CallbackQueryHandler)
+
+def OnInlineQueryMiddleware():
+    return BaseMiddleware(InlineQueryHandler)
+
+def OnRawUpdateMiddleware():
+    return BaseMiddleware(RawUpdateHandler)
+
+def OnPollMiddleware():
+    return BaseMiddleware(PollHandler)
+
+def OnDeletedMessagesMiddleware():
+    return BaseMiddleware(DeletedMessagesHandler)
+
+def OnChosenInlineResultMiddleware():
+    return BaseMiddleware(ChosenInlineResultHandler)
+
+def OnChatMemberUpdatedMiddleware():
+    return BaseMiddleware(ChatMemberUpdatedHandler)
+
+def OnChatJoinRequestMiddleware():
+    return BaseMiddleware(ChatJoinRequestHandler)
+
+def OnUserStatusMiddleware():
+    return BaseMiddleware(UserStatusHandler)
+
+def OnBusinessConnectionMiddleware():
+    return BaseMiddleware(BusinessConnectionHandler)
+
+def OnBusinessMessageMiddleware():
+    return BaseMiddleware(BusinessMessageHandler)
+
+def OnChatBoostMiddleware():
+    return BaseMiddleware(ChatBoostHandler)
+
+def OnDeletedBusinessMessagesMiddleware():
+    return BaseMiddleware(DeletedBusinessMessagesHandler)
+
+def OnStartMiddleware():
+    return BaseMiddleware(StartHandler)
+
+def OnStopMiddleware():
+    return BaseMiddleware(StopHandler)
+
+def OnConnectMiddleware():
+    return BaseMiddleware(ConnectHandler)
+
+def OnDisconnectMiddleware():
+    return BaseMiddleware(DisconnectHandler)
+
+def OnEditedBusinessMessageMiddleware():
+    return BaseMiddleware(EditedBusinessMessageHandler)
+
+def OnMessageReactionCountMiddleware():
+    return BaseMiddleware(MessageReactionCountHandler)
+
+def OnMessageReactionMiddleware():
+    return BaseMiddleware(MessageReactionHandler)
+
+def OnPreCheckoutQueryMiddleware():
+    return BaseMiddleware(PreCheckoutQueryHandler)
+
+def OnPurchasedPaidMediaMiddleware():
+    return BaseMiddleware(PurchasedPaidMediaHandler)
+
+def OnShippingQueryMiddleware():
+    return BaseMiddleware(ShippingQueryHandler)
+
+def OnStoryMiddleware():
+    return BaseMiddleware(StoryHandler)

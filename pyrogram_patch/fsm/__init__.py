@@ -1,71 +1,28 @@
-"""Finite State Machine (FSM) implementation for Pyrogram.
+# pyrogram_patch/fsm/__init__.py
+"""Finite State Machine (FSM) utilities for Pyrogram Patch.
 
-This module provides a flexible and extensible framework for managing stateful
-interactions in Pyrogram bots, supporting various storage backends.
+This package provides:
+    - FSMContext: the runtime interface for managing state and data
+    - State and StatesGroup: declarative state definitions
+    - Storage backends: MemoryFSMStorage, RedisFSMStorage, BaseStorage
+    - Filters: StateFilter, AnyStateFilter, NoStateFilter
 """
 
-import sys
-from typing import TYPE_CHECKING, Optional, Union
-
-# Re-export main components
-from .base_storage import (
-    BaseStorage,
-    StateData,
-    StorageError,
-    StateNotFoundError,
-    StateValidationError,
-)
-from .context import FSMContext
-from .states import State, StateItem, StatesGroup
-
-# For type checking only
-if TYPE_CHECKING:
-    from pyrogram.types import Message, CallbackQuery
+from pyrogram_patch.fsm.context import FSMContext
+from pyrogram_patch.fsm.states import State, StatesGroup
+from pyrogram_patch.fsm.base_storage import BaseStorage
+from pyrogram_patch.fsm.filter import StateFilter, AnyStateFilter, NoStateFilter
+from pyrogram_patch.fsm.storages.memory_storage import MemoryStorage
+from pyrogram_patch.fsm.storages.redis_storage import RedisStorage
 
 __all__ = [
-    'FSMContext',
-    'BaseStorage',
-    'State',
-    'StateData',
-    'StateItem',
-    'StatesGroup',
-    'StorageError',
-    'StateNotFoundError',
-    'StateValidationError',
-]
-
-# Add version if not in type checking mode
-if not TYPE_CHECKING:
-    try:
-        from importlib.metadata import version, PackageNotFoundError
-        
-        try:
-            __version__ = version("pyrogram-fsm")
-        except PackageNotFoundError:
-            __version__ = "0.1.0"  # Fallback version
-    except ImportError:
-        __version__ = "0.1.0"  # Fallback for Python < 3.8
-
-# Define public API
-__all__ = [
-    # Core components
+    "FSMContext",
     "State",
     "StatesGroup",
-    "StateItem",
-    
-    # Storage
     "BaseStorage",
-    "StateData",
-    
-    # Exceptions
-    "StorageError",
-    "StateNotFoundError",
-    "StateValidationError",
+    "MemoryStorage",
+    "RedisStorage",
+    "StateFilter",
+    "AnyStateFilter",
+    "NoStateFilter",
 ]
-
-# Add __all__ to the module's __dict__ for better IDE support
-if not TYPE_CHECKING:
-    globals().update({k: k for k in __all__})
-
-# Clean up the namespace
-del sys, TYPE_CHECKING

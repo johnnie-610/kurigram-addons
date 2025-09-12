@@ -16,74 +16,9 @@ work with the Pyrogram framework and provide a clean interface for registering
 event handlers.
 """
 
-from typing import Type
 
-# Import all handler classes
-from .on_callback_query import OnCallbackQuery
-from .on_chat_join_request import OnChatJoinRequest
-from .on_chat_member_updated import OnChatMemberUpdated
-from .on_chosen_inline_result import OnChosenInlineResult
-from .on_deleted_messages import OnDeletedMessages
-from .on_disconnect import OnDisconnect
-from .on_edited_message import OnEditedMessage
-from .on_inline_query import OnInlineQuery
-from .on_message import OnMessage
-from .on_poll import OnPoll
-from .on_raw_update import OnRawUpdate
-from .on_user_status import OnUserStatus
+from pyrogram_patch.router.patched_decorators.decorators import PatchedDecorators
 
 __all__ = [
-    'PatchedDecorators',
-    'OnCallbackQuery',
-    'OnChatJoinRequest',
-    'OnChatMemberUpdated',
-    'OnChosenInlineResult',
-    'OnDeletedMessages',
-    'OnDisconnect',
-    'OnEditedMessage',
-    'OnInlineQuery',
-    'OnMessage',
-    'OnPoll',
-    'OnRawUpdate',
-    'OnUserStatus'
+    'PatchedDecorators'
 ]
-
-
-class PatchedDecorators(
-    OnMessage,
-    OnEditedMessage,
-    OnDeletedMessages,
-    OnCallbackQuery,
-    OnRawUpdate,
-    OnDisconnect,
-    OnUserStatus,
-    OnInlineQuery,
-    OnPoll,
-    OnChosenInlineResult,
-    OnChatMemberUpdated,
-    OnChatJoinRequest,
-):
-    """
-    A composite class that combines all available Pyrogram event decorators.
-    
-    This class provides a single interface to access all Pyrogram event decorators
-    through multiple inheritance. It's designed to be used as a mixin class in
-    custom router implementations.
-    
-    Example:
-        ```python
-        from pyrogram import Client
-        from pyrogram_patch.router import Router
-        from pyrogram_patch.router.patched_decorators import PatchedDecorators
-        
-        class MyRouter(Router, PatchedDecorators):
-            pass
-            
-        router = MyRouter()
-        
-        @router.on_message()
-        async def handle_message(client, message):
-            print(f"Received message: {message.text}")
-        ```
-    """
-    __slots__ = ()  # Prevent creation of __dict__ for memory efficiency
