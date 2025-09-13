@@ -11,8 +11,8 @@
 import hashlib
 import inspect
 import json
-import traceback
 import logging
+import traceback
 from typing import Any, Dict, Optional, Union
 
 logger = logging.getLogger("pykeyboard")

@@ -38,9 +38,13 @@ class OnRawUpdate:
         def decorator(func: Callable) -> Callable:
             if isinstance(self, pyrogram_patch.router.Router):
                 if self._app is not None:
-                    self._app.add_handler(pyrogram.handlers.RawUpdateHandler(func), group)
+                    self._app.add_handler(
+                        pyrogram.handlers.RawUpdateHandler(func), group
+                    )
                 else:
-                    self._decorators_storage.append((pyrogram.handlers.RawUpdateHandler(func), group))
+                    self._decorators_storage.append(
+                        (pyrogram.handlers.RawUpdateHandler(func), group)
+                    )
             else:
                 raise RuntimeError(
                     "you should only use this in routers, and only as a decorator"

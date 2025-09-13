@@ -43,10 +43,18 @@ class OnCallbackQuery:
             if isinstance(self, pyrogram_patch.router.Router):
                 if self._app is not None:
                     self._app.add_handler(
-                        pyrogram.handlers.CallbackQueryHandler(func, filters), group
+                        pyrogram.handlers.CallbackQueryHandler(func, filters),
+                        group,
                     )
                 else:
-                    self._decorators_storage.append((pyrogram.handlers.CallbackQueryHandler(func, filters), group))
+                    self._decorators_storage.append(
+                        (
+                            pyrogram.handlers.CallbackQueryHandler(
+                                func, filters
+                            ),
+                            group,
+                        )
+                    )
 
             else:
                 raise RuntimeError(

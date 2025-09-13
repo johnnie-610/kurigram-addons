@@ -1,44 +1,37 @@
-# pyrogram_patch.middlewares.middleware_types.middlewares
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
+
 from __future__ import annotations
 
 import logging
 from typing import Any, Callable, Optional
 
-from pyrogram_patch import errors
-
 logger = logging.getLogger("pyrogram_patch.middleware_types")
 
 
-# Try to import Pyrogram handler types; be resilient if Pyrogram not installed
 try:
-    from pyrogram.handlers import (
-        CallbackQueryHandler,
-        ChatJoinRequestHandler,
-        ChatMemberUpdatedHandler,
-        ChosenInlineResultHandler,
-        DeletedMessagesHandler,
-        EditedMessageHandler,
-        InlineQueryHandler,
-        MessageHandler,
-        PollHandler,
-        RawUpdateHandler,
-        UserStatusHandler,
-        BusinessConnectionHandler,
-        BusinessMessageHandler,
-        ChatBoostHandler,
-        DeletedBusinessMessagesHandler,
-        StartHandler,
-        StopHandler,
-        ConnectHandler,
-        DisconnectHandler,
-        EditedBusinessMessageHandler,
-        MessageReactionCountHandler,
-        MessageReactionHandler,
-        PreCheckoutQueryHandler,
-        PurchasedPaidMediaHandler,
-        ShippingQueryHandler,
-        StoryHandler,
-    )
+    from pyrogram.handlers import (BusinessConnectionHandler,
+                                   BusinessMessageHandler, CallbackQueryHandler,
+                                   ChatBoostHandler, ChatJoinRequestHandler,
+                                   ChatMemberUpdatedHandler,
+                                   ChosenInlineResultHandler, ConnectHandler,
+                                   DeletedBusinessMessagesHandler,
+                                   DeletedMessagesHandler, DisconnectHandler,
+                                   EditedBusinessMessageHandler,
+                                   EditedMessageHandler, InlineQueryHandler,
+                                   MessageHandler, MessageReactionCountHandler,
+                                   MessageReactionHandler, PollHandler,
+                                   PreCheckoutQueryHandler,
+                                   PurchasedPaidMediaHandler, RawUpdateHandler,
+                                   ShippingQueryHandler, StartHandler,
+                                   StopHandler, StoryHandler, UserStatusHandler)
 except Exception:  # pragma: no cover - optional dependency
     CallbackQueryHandler = object
     ChatJoinRequestHandler = object
@@ -67,6 +60,7 @@ except Exception:  # pragma: no cover - optional dependency
     ShippingQueryHandler = object
     StoryHandler = object
 
+
 class BaseMiddleware:
     """Lightweight facade representing middleware that targets specific Pyrogram handler types.
 
@@ -84,8 +78,12 @@ class BaseMiddleware:
         """Return True if a pyrogram.Handler instance/class matches any of the handler types."""
         try:
             # handler may be a Handler class or instance
-            htype = getattr(handler, '__class__', handler)
-            return any(issubclass(htype, t) for t in self._handler_types if isinstance(t, type))
+            htype = getattr(handler, "__class__", handler)
+            return any(
+                issubclass(htype, t)
+                for t in self._handler_types
+                if isinstance(t, type)
+            )
         except Exception:
             return False
 
@@ -94,11 +92,14 @@ class BaseMiddleware:
 
         The returned function has signature: async def around(next_handler) -> wrapped_handler
         """
+
         def make_around(next_handler):
             async def wrapped(update):
                 # Basic compatibility: do not alter update; simply call next_handler
                 await next_handler(update)
+
             return wrapped
+
         return make_around
 
 
@@ -106,77 +107,107 @@ class BaseMiddleware:
 def OnMessageMiddleware():
     return BaseMiddleware(MessageHandler)
 
+
 def OnEditedMessageMiddleware():
     return BaseMiddleware(EditedMessageHandler)
+
 
 def OnCallbackQueryMiddleware():
     return BaseMiddleware(CallbackQueryHandler)
 
+
 def OnInlineQueryMiddleware():
     return BaseMiddleware(InlineQueryHandler)
+
 
 def OnRawUpdateMiddleware():
     return BaseMiddleware(RawUpdateHandler)
 
+
 def OnPollMiddleware():
     return BaseMiddleware(PollHandler)
+
 
 def OnDeletedMessagesMiddleware():
     return BaseMiddleware(DeletedMessagesHandler)
 
+
 def OnChosenInlineResultMiddleware():
     return BaseMiddleware(ChosenInlineResultHandler)
+
 
 def OnChatMemberUpdatedMiddleware():
     return BaseMiddleware(ChatMemberUpdatedHandler)
 
+
 def OnChatJoinRequestMiddleware():
     return BaseMiddleware(ChatJoinRequestHandler)
+
 
 def OnUserStatusMiddleware():
     return BaseMiddleware(UserStatusHandler)
 
+
 def OnBusinessConnectionMiddleware():
     return BaseMiddleware(BusinessConnectionHandler)
+
 
 def OnBusinessMessageMiddleware():
     return BaseMiddleware(BusinessMessageHandler)
 
+
 def OnChatBoostMiddleware():
     return BaseMiddleware(ChatBoostHandler)
+
 
 def OnDeletedBusinessMessagesMiddleware():
     return BaseMiddleware(DeletedBusinessMessagesHandler)
 
+
 def OnStartMiddleware():
     return BaseMiddleware(StartHandler)
+
 
 def OnStopMiddleware():
     return BaseMiddleware(StopHandler)
 
+
 def OnConnectMiddleware():
     return BaseMiddleware(ConnectHandler)
+
 
 def OnDisconnectMiddleware():
     return BaseMiddleware(DisconnectHandler)
 
+
 def OnEditedBusinessMessageMiddleware():
     return BaseMiddleware(EditedBusinessMessageHandler)
+
 
 def OnMessageReactionCountMiddleware():
     return BaseMiddleware(MessageReactionCountHandler)
 
+
 def OnMessageReactionMiddleware():
     return BaseMiddleware(MessageReactionHandler)
+
 
 def OnPreCheckoutQueryMiddleware():
     return BaseMiddleware(PreCheckoutQueryHandler)
 
+
 def OnPurchasedPaidMediaMiddleware():
     return BaseMiddleware(PurchasedPaidMediaHandler)
+
 
 def OnShippingQueryMiddleware():
     return BaseMiddleware(ShippingQueryHandler)
 
+
 def OnStoryMiddleware():
     return BaseMiddleware(StoryHandler)
+
+
+class MixedMiddleware(BaseMiddleware):
+    # TODO: implement
+    pass

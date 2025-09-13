@@ -4,6 +4,7 @@ pkgs.mkShell {
   packages = with pkgs; [
     python3
     poetry
+    redis
     # gcc.cc.lib
   ];
 

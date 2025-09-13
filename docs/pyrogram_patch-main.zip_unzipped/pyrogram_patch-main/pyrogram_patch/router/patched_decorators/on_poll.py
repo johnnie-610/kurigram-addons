@@ -46,7 +46,9 @@ class OnPoll:
                         pyrogram.handlers.PollHandler(func, filters), group
                     )
                 else:
-                    self._decorators_storage.append((pyrogram.handlers.PollHandler(func, filters), group))
+                    self._decorators_storage.append(
+                        (pyrogram.handlers.PollHandler(func, filters), group)
+                    )
             else:
                 raise RuntimeError(
                     "you should only use this in routers, and only as a decorator"

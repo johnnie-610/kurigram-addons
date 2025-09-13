@@ -6,209 +6,210 @@
 #
 # For the full copyright and license information, please view the LICENSE
 # file that was distributed with this source code
+#
+# Decorators module for Pyrogram event handling.
+#
+# This module provides the PatchedDecorators class that dynamically generates
+# decorator methods for all Pyrogram event types using a clean factory pattern.
 
-"""Decorators module for Pyrogram event handling.
-
-This module provides the PatchedDecorators class that dynamically generates
-decorator methods for all Pyrogram event types using a clean factory pattern.
-"""
 
 import logging
 from typing import Dict, Tuple
 
-from pyrogram_patch.router.patched_decorators.factory import create_decorator_method
+from pyrogram_patch.router.patched_decorators.factory import \
+    create_decorator_method
 
 logger = logging.getLogger("pyrogram_patch.router.patched_decorators")
 
-__all__ = ['PatchedDecorators']
+__all__ = ["PatchedDecorators"]
 
 # Handler configuration mapping
-# Format: event_key -> (handler_class_name, description, callback_signature, param_name, type_name)
 HANDLER_CONFIGS: Dict[str, Tuple[str, str, str, str, str]] = {
-    'message': (
-        'MessageHandler',
-        'new messages',
-        'client: Client, message: Message',
-        'message',
-        'Message'
+    "message": (
+        "MessageHandler",
+        "new messages",
+        "client: Client, message: Message",
+        "message",
+        "Message",
     ),
-    'edited_message': (
-        'EditedMessageHandler',
-        'edited messages',
-        'client: Client, message: Message',
-        'message',
-        'Message'
+    "edited_message": (
+        "EditedMessageHandler",
+        "edited messages",
+        "client: Client, message: Message",
+        "message",
+        "Message",
     ),
-    'deleted_messages': (
-        'DeletedMessagesHandler',
-        'deleted messages',
-        'client: Client, deleted_messages: DeletedMessages',
-        'deleted_messages',
-        'DeletedMessages'
+    "deleted_messages": (
+        "DeletedMessagesHandler",
+        "deleted messages",
+        "client: Client, deleted_messages: DeletedMessages",
+        "deleted_messages",
+        "DeletedMessages",
     ),
-    'callback_query': (
-        'CallbackQueryHandler',
-        'callback queries from inline keyboards',
-        'client: Client, callback_query: CallbackQuery',
-        'callback_query',
-        'CallbackQuery'
+    "callback_query": (
+        "CallbackQueryHandler",
+        "callback queries from inline keyboards",
+        "client: Client, callback_query: CallbackQuery",
+        "callback_query",
+        "CallbackQuery",
     ),
-    'chat_join_request': (
-        'ChatJoinRequestHandler',
-        'chat join requests',
-        'client: Client, chat_join_request: ChatJoinRequest',
-        'chat_join_request',
-        'ChatJoinRequest'
+    "chat_join_request": (
+        "ChatJoinRequestHandler",
+        "chat join requests",
+        "client: Client, chat_join_request: ChatJoinRequest",
+        "chat_join_request",
+        "ChatJoinRequest",
     ),
-    'chat_member_updated': (
-        'ChatMemberUpdatedHandler',
-        'chat member status updates',
-        'client: Client, chat_member_updated: ChatMemberUpdated',
-        'chat_member_updated',
-        'ChatMemberUpdated'
+    "chat_member_updated": (
+        "ChatMemberUpdatedHandler",
+        "chat member status updates",
+        "client: Client, chat_member_updated: ChatMemberUpdated",
+        "chat_member_updated",
+        "ChatMemberUpdated",
     ),
-    'chosen_inline_result': (
-        'ChosenInlineResultHandler',
-        'chosen inline query results',
-        'client: Client, chosen_inline_result: ChosenInlineResult',
-        'chosen_inline_result',
-        'ChosenInlineResult'
+    "chosen_inline_result": (
+        "ChosenInlineResultHandler",
+        "chosen inline query results",
+        "client: Client, chosen_inline_result: ChosenInlineResult",
+        "chosen_inline_result",
+        "ChosenInlineResult",
     ),
-    'inline_query': (
-        'InlineQueryHandler',
-        'inline queries',
-        'client: Client, inline_query: InlineQuery',
-        'inline_query',
-        'InlineQuery'
+    "inline_query": (
+        "InlineQueryHandler",
+        "inline queries",
+        "client: Client, inline_query: InlineQuery",
+        "inline_query",
+        "InlineQuery",
     ),
-    'poll': (
-        'PollHandler',
-        'poll updates',
-        'client: Client, poll: Poll',
-        'poll',
-        'Poll'
+    "poll": (
+        "PollHandler",
+        "poll updates",
+        "client: Client, poll: Poll",
+        "poll",
+        "Poll",
     ),
-    'raw_update': (
-        'RawUpdateHandler',
-        'raw Telegram updates',
-        'client: Client, update: Update, users: Dict[int, User], chats: Dict[int, Chat]',
-        'update',
-        'Update'
+    "raw_update": (
+        "RawUpdateHandler",
+        "raw Telegram updates",
+        "client: Client, update: Update, users: Dict[int, User], chats: Dict[int, Chat]",
+        "update",
+        "Update",
     ),
-    'user_status': (
-        'UserStatusHandler',
-        'user status changes',
-        'client: Client, user: User',
-        'user',
-        'User'
+    "user_status": (
+        "UserStatusHandler",
+        "user status changes",
+        "client: Client, user: User",
+        "user",
+        "User",
     ),
-    'business_message': (
-        'BusinessMessageHandler',
-        'business account messages',
-        'client: Client, business_message: BusinessMessage',
-        'business_message',
-        'BusinessMessage'
+    "business_message": (
+        "BusinessMessageHandler",
+        "business account messages",
+        "client: Client, business_message: BusinessMessage",
+        "business_message",
+        "BusinessMessage",
     ),
-    'edited_business_message': (
-        'EditedBusinessMessageHandler',
-        'edited business messages',
-        'client: Client, edited_business_message: BusinessMessage',
-        'edited_business_message',
-        'BusinessMessage'
+    "edited_business_message": (
+        "EditedBusinessMessageHandler",
+        "edited business messages",
+        "client: Client, edited_business_message: BusinessMessage",
+        "edited_business_message",
+        "BusinessMessage",
     ),
-    'deleted_business_messages': (
-        'DeletedBusinessMessagesHandler',
-        'deleted business messages',
-        'client: Client, deleted_business_messages: DeletedBusinessMessages',
-        'deleted_business_messages',
-        'DeletedBusinessMessages'
+    "deleted_business_messages": (
+        "DeletedBusinessMessagesHandler",
+        "deleted business messages",
+        "client: Client, deleted_business_messages: DeletedBusinessMessages",
+        "deleted_business_messages",
+        "DeletedBusinessMessages",
     ),
-    'message_reaction_count': (
-        'MessageReactionCountHandler',
-        'message reaction count updates',
-        'client: Client, message_reaction_count: MessageReactionCount',
-        'message_reaction_count',
-        'MessageReactionCount'
+    "message_reaction_count": (
+        "MessageReactionCountHandler",
+        "message reaction count updates",
+        "client: Client, message_reaction_count: MessageReactionCount",
+        "message_reaction_count",
+        "MessageReactionCount",
     ),
-    'message_reaction': (
-        'MessageReactionHandler',
-        'message reaction updates',
-        'client: Client, message_reaction: MessageReaction',
-        'message_reaction',
-        'MessageReaction'
+    "message_reaction": (
+        "MessageReactionHandler",
+        "message reaction updates",
+        "client: Client, message_reaction: MessageReaction",
+        "message_reaction",
+        "MessageReaction",
     ),
-    'business_connection': (
-        'BusinessConnectionHandler',
-        'business connection updates',
-        'client: Client, business_connection: BusinessConnection',
-        'business_connection',
-        'BusinessConnection'
+    "business_connection": (
+        "BusinessConnectionHandler",
+        "business connection updates",
+        "client: Client, business_connection: BusinessConnection",
+        "business_connection",
+        "BusinessConnection",
     ),
-    'story': (
-        'StoryHandler',
-        'story updates',
-        'client: Client, story: Story',
-        'story',
-        'Story'
+    "story": (
+        "StoryHandler",
+        "story updates",
+        "client: Client, story: Story",
+        "story",
+        "Story",
     ),
-    'chat_boost': (
-        'ChatBoostHandler',
-        'chat boost notifications',
-        'client: Client, chat_boost: ChatBoost',
-        'chat_boost',
-        'ChatBoost'
+    "chat_boost": (
+        "ChatBoostHandler",
+        "chat boost notifications",
+        "client: Client, chat_boost: ChatBoost",
+        "chat_boost",
+        "ChatBoost",
     ),
-    'pre_checkout_query': (
-        'PreCheckoutQueryHandler',
-        'pre-checkout queries for payments',
-        'client: Client, pre_checkout_query: PreCheckoutQuery',
-        'pre_checkout_query',
-        'PreCheckoutQuery'
+    "pre_checkout_query": (
+        "PreCheckoutQueryHandler",
+        "pre-checkout queries for payments",
+        "client: Client, pre_checkout_query: PreCheckoutQuery",
+        "pre_checkout_query",
+        "PreCheckoutQuery",
     ),
-    'purchased_paid_media': (
-        'PurchasedPaidMediaHandler',
-        'purchased paid media notifications',
-        'client: Client, purchased_paid_media: PurchasedPaidMedia',
-        'purchased_paid_media',
-        'PurchasedPaidMedia'
+    "purchased_paid_media": (
+        "PurchasedPaidMediaHandler",
+        "purchased paid media notifications",
+        "client: Client, purchased_paid_media: PurchasedPaidMedia",
+        "purchased_paid_media",
+        "PurchasedPaidMedia",
     ),
-    'shipping_query': (
-        'ShippingQueryHandler',
-        'shipping queries for payments',
-        'client: Client, shipping_query: ShippingQuery',
-        'shipping_query',
-        'ShippingQuery'
+    "shipping_query": (
+        "ShippingQueryHandler",
+        "shipping queries for payments",
+        "client: Client, shipping_query: ShippingQuery",
+        "shipping_query",
+        "ShippingQuery",
     ),
     # Client lifecycle events
-    'start': (
-        'StartHandler',
-        'client start events',
-        'client: Client',
-        'client',
-        'Client'
+    "start": (
+        "StartHandler",
+        "client start events",
+        "client: Client",
+        "client",
+        "Client",
     ),
-    'stop': (
-        'StopHandler',
-        'client stop events',
-        'client: Client',
-        'client',
-        'Client'
+    "stop": (
+        "StopHandler",
+        "client stop events",
+        "client: Client",
+        "client",
+        "Client",
     ),
-    'connect': (
-        'ConnectHandler',
-        'client connection events',
-        'client: Client',
-        'client',
-        'Client'
+    "connect": (
+        "ConnectHandler",
+        "client connection events",
+        "client: Client",
+        "client",
+        "Client",
     ),
-    'disconnect': (
-        'DisconnectHandler',
-        'client disconnection events',
-        'client: Client',
-        'client',
-        'Client'
+    "disconnect": (
+        "DisconnectHandler",
+        "client disconnection events",
+        "client: Client",
+        "client",
+        "Client",
     ),
 }
+
 
 class PatchedDecoratorsMeta(type):
     """Metaclass that dynamically creates decorator methods for all Pyrogram events."""
@@ -216,7 +217,13 @@ class PatchedDecoratorsMeta(type):
     def __new__(mcs, name: str, bases: tuple, namespace: dict) -> type:
         # Generate decorator methods for each handler configuration
         for event_key, config in HANDLER_CONFIGS.items():
-            handler_class_name, description, signature, param_name, type_name = config
+            (
+                handler_class_name,
+                description,
+                signature,
+                param_name,
+                type_name,
+            ) = config
 
             # Create the decorator method
             method = create_decorator_method(
@@ -224,14 +231,15 @@ class PatchedDecoratorsMeta(type):
                 event_description=description,
                 callback_signature=signature,
                 event_parameter=param_name,
-                event_type=type_name
+                event_type=type_name,
             )
 
             # Add to class namespace
-            method_name = f'on_{event_key}'
+            method_name = f"on_{event_key}"
             namespace[method_name] = method
 
         return super().__new__(mcs, name, bases, namespace)
+
 
 class PatchedDecorators(metaclass=PatchedDecoratorsMeta):
     """Base class providing all Pyrogram event decorators.
@@ -313,13 +321,15 @@ class PatchedDecorators(metaclass=PatchedDecoratorsMeta):
         if event_name not in HANDLER_CONFIGS:
             raise KeyError(f"Unknown event type: {event_name}")
 
-        handler_class, description, signature, param_name, type_name = HANDLER_CONFIGS[event_name]
+        handler_class, description, signature, param_name, type_name = (
+            HANDLER_CONFIGS[event_name]
+        )
 
         return {
-            'handler_class': handler_class,
-            'description': description,
-            'callback_signature': signature,
-            'parameter_name': param_name,
-            'type_name': type_name,
-            'decorator_name': f'on_{event_name}'
+            "handler_class": handler_class,
+            "description": description,
+            "callback_signature": signature,
+            "parameter_name": param_name,
+            "type_name": type_name,
+            "decorator_name": f"on_{event_name}",
         }

@@ -12,7 +12,6 @@ import logging
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Union
 
-
 from pydantic import Field, PrivateAttr, model_validator
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 

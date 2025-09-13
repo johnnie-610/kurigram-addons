@@ -1,6 +1,9 @@
-import pytest
-from pyrogram_patch.patch_data_pool import PatchDataPool, PoolConfig
 import asyncio
+
+import pytest
+
+from pyrogram_patch.patch_data_pool import PatchDataPool, PoolConfig
+
 
 @pytest.mark.asyncio
 async def test_pool_eviction_and_middleware():

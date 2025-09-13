@@ -1,4 +1,12 @@
-# pyrogram_patch/fsm/filter.py
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +22,13 @@ logger = logging.getLogger("pyrogram_patch.fsm.filter")
 class StateFilter:
     """Filter that passes if the FSM state matches the expected value."""
 
-    def __init__(self, expected: Union[str, State], *, storage: Any = None, identifier_getter: Optional[callable] = None) -> None:
+    def __init__(
+        self,
+        expected: Union[str, State],
+        *,
+        storage: Any = None,
+        identifier_getter: Optional[callable] = None,
+    ) -> None:
         self.expected = str(expected)
         self.storage = storage
         self.identifier_getter = identifier_getter
@@ -27,27 +41,35 @@ class StateFilter:
         try:
             # Try the new FSMContextManager approach first
             try:
-                from pyrogram_patch.patch_data_pool import initialize_global_pool
                 from pyrogram import Client
+
+                from pyrogram_patch.patch_data_pool import \
+                    initialize_global_pool
+
                 # Get client from update if possible
-                client = getattr(update, '_client', None)
+                client = getattr(update, "_client", None)
                 if client is None:
                     # Try to get from message
-                    msg = getattr(update, 'message', None)
-                    if msg and hasattr(msg, '_client'):
+                    msg = getattr(update, "message", None)
+                    if msg and hasattr(msg, "_client"):
                         client = msg._client
                 if client:
                     pool = await initialize_global_pool(client)
                     if pool._fsm_manager:
                         ctx = await pool._fsm_manager.from_update(update)
                         current_state = await ctx.get_state()
-                        return self.expected == str(current_state) if current_state else False
+                        return (
+                            self.expected == str(current_state)
+                            if current_state
+                            else False
+                        )
             except Exception:
                 pass
 
             # Fallback to pool-based approach
             try:
                 from pyrogram_patch.patch_helper import PatchHelper
+
                 helper = PatchHelper.get_from_pool(update)
                 current_state = str(helper.state)
                 return self.expected == current_state
@@ -74,8 +96,12 @@ class StateFilter:
             return self.identifier_getter(update)
 
         # Default: try chat id
-        msg = getattr(update, "message", None) or (update.get("message") if isinstance(update, dict) else None)
-        chat = getattr(msg, "chat", None) or (msg.get("chat") if isinstance(msg, dict) else None)
+        msg = getattr(update, "message", None) or (
+            update.get("message") if isinstance(update, dict) else None
+        )
+        chat = getattr(msg, "chat", None) or (
+            msg.get("chat") if isinstance(msg, dict) else None
+        )
         if chat:
             return f"chat:{getattr(chat, 'id', None) or chat.get('id')}"
         return "global"
@@ -92,7 +118,7 @@ class CombinedFilter:
 
     async def __call__(self, client: Any, update: Any) -> bool:
         for filter_obj in self.filters:
-            if hasattr(filter_obj, '__call__'):
+            if hasattr(filter_obj, "__call__"):
                 try:
                     if not await filter_obj(client, update):
                         return False
@@ -106,10 +132,17 @@ class CombinedFilter:
                     return False
         return True
 
+
 class AnyStateFilter:
     """Filter that passes if the FSM state is in the given list."""
 
-    def __init__(self, expected_states: Sequence[Union[str, State]], *, storage: Any = None, identifier_getter: Optional[callable] = None) -> None:
+    def __init__(
+        self,
+        expected_states: Sequence[Union[str, State]],
+        *,
+        storage: Any = None,
+        identifier_getter: Optional[callable] = None,
+    ) -> None:
         self.expected = {str(s) for s in expected_states}
         self.storage = storage
         self.identifier_getter = identifier_getter
@@ -122,27 +155,35 @@ class AnyStateFilter:
         try:
             # Try the new FSMContextManager approach first
             try:
-                from pyrogram_patch.patch_data_pool import initialize_global_pool
                 from pyrogram import Client
+
+                from pyrogram_patch.patch_data_pool import \
+                    initialize_global_pool
+
                 # Get client from update if possible
-                client = getattr(update, '_client', None)
+                client = getattr(update, "_client", None)
                 if client is None:
                     # Try to get from message
-                    msg = getattr(update, 'message', None)
-                    if msg and hasattr(msg, '_client'):
+                    msg = getattr(update, "message", None)
+                    if msg and hasattr(msg, "_client"):
                         client = msg._client
                 if client:
                     pool = await initialize_global_pool(client)
                     if pool._fsm_manager:
                         ctx = await pool._fsm_manager.from_update(update)
                         current_state = await ctx.get_state()
-                        return str(current_state) in self.expected if current_state else False
+                        return (
+                            str(current_state) in self.expected
+                            if current_state
+                            else False
+                        )
             except Exception:
                 pass
 
             # Fallback to pool-based approach
             try:
                 from pyrogram_patch.patch_helper import PatchHelper
+
                 helper = PatchHelper.get_from_pool(update)
                 current_state = str(helper.state)
                 return current_state in self.expected
@@ -166,8 +207,12 @@ class AnyStateFilter:
         if self.identifier_getter:
             return self.identifier_getter(update)
 
-        msg = getattr(update, "message", None) or (update.get("message") if isinstance(update, dict) else None)
-        chat = getattr(msg, "chat", None) or (msg.get("chat") if isinstance(msg, dict) else None)
+        msg = getattr(update, "message", None) or (
+            update.get("message") if isinstance(update, dict) else None
+        )
+        chat = getattr(msg, "chat", None) or (
+            msg.get("chat") if isinstance(msg, dict) else None
+        )
         if chat:
             return f"chat:{getattr(chat, 'id', None) or chat.get('id')}"
         return "global"
@@ -176,7 +221,12 @@ class AnyStateFilter:
 class NoStateFilter:
     """Filter that passes if no FSM state is currently set."""
 
-    def __init__(self, *, storage: Any = None, identifier_getter: Optional[callable] = None) -> None:
+    def __init__(
+        self,
+        *,
+        storage: Any = None,
+        identifier_getter: Optional[callable] = None,
+    ) -> None:
         self.storage = storage
         self.identifier_getter = identifier_getter
 
@@ -188,14 +238,17 @@ class NoStateFilter:
         try:
             # Try the new FSMContextManager approach first
             try:
-                from pyrogram_patch.patch_data_pool import initialize_global_pool
                 from pyrogram import Client
+
+                from pyrogram_patch.patch_data_pool import \
+                    initialize_global_pool
+
                 # Get client from update if possible
-                client = getattr(update, '_client', None)
+                client = getattr(update, "_client", None)
                 if client is None:
                     # Try to get from message
-                    msg = getattr(update, 'message', None)
-                    if msg and hasattr(msg, '_client'):
+                    msg = getattr(update, "message", None)
+                    if msg and hasattr(msg, "_client"):
                         client = msg._client
                 if client:
                     pool = await initialize_global_pool(client)
@@ -209,6 +262,7 @@ class NoStateFilter:
             # Fallback to pool-based approach
             try:
                 from pyrogram_patch.patch_helper import PatchHelper
+
                 helper = PatchHelper.get_from_pool(update)
                 current_state = helper.state
                 return current_state == "*" or current_state is None
@@ -230,8 +284,12 @@ class NoStateFilter:
         if self.identifier_getter:
             return self.identifier_getter(update)
 
-        msg = getattr(update, "message", None) or (update.get("message") if isinstance(update, dict) else None)
-        chat = getattr(msg, "chat", None) or (msg.get("chat") if isinstance(update, dict) else None)
+        msg = getattr(update, "message", None) or (
+            update.get("message") if isinstance(update, dict) else None
+        )
+        chat = getattr(msg, "chat", None) or (
+            msg.get("chat") if isinstance(update, dict) else None
+        )
         if chat:
             return f"chat:{getattr(chat, 'id', None) or chat.get('id')}"
         return "global"

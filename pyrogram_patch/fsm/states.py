@@ -1,10 +1,20 @@
-# pyrogram_patch/fsm/states.py
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Dict, Optional
 
 logger = logging.getLogger("pyrogram_patch.fsm.states")
+
 
 class State:
     """Represents a single FSM state.
@@ -63,3 +73,28 @@ class StatesGroup(metaclass=StatesGroupMeta):
         for value in vars(self.__class__).values():
             if isinstance(value, State):
                 yield value
+
+
+# Compatibility layer
+class StateItem:
+    """
+    This class is used for compatibility.
+
+    Deprecation: This class is deprecated. Please use State directly
+
+    Example:
+    ```python
+    class Registration(StatesGroup):
+        name = State()
+        confirm = State()
+    ```
+    """
+
+    def __init__(self, state: State) -> None:
+        self._state = state
+        warnings.warn(
+            "StateItem is deprecated. Please use State directly"
+            "This class will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )

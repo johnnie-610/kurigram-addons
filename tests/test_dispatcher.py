@@ -1,4 +1,5 @@
 import asyncio
+
 import pytest
 
 # Test commented out as it uses DispatcherPatch and DispatcherConfig classes
@@ -37,6 +38,7 @@ import pytest
 #     await asyncio.sleep(0.05)
 #     await dp.stop()
 #     assert any(r[0] == "sync" for r in received)
+
 
 # Placeholder test - dispatcher functionality is tested through integration
 @pytest.mark.asyncio

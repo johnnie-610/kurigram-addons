@@ -1,26 +1,37 @@
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
+
 from __future__ import annotations
 
 import asyncio
-import time
 import logging
+import time
 import weakref
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
-
-from pyrogram.types import Update
 from pyrogram import Client
+from pyrogram.types import Update
 
-from pyrogram_patch.errors import PatchError, MiddlewareError
 import pyrogram_patch.patch_helper as ph
-from pyrogram_patch.middlewares.middleware_manager import MiddlewareManager
+from pyrogram_patch.errors import MiddlewareError, PatchError
 from pyrogram_patch.fsm.base_storage import BaseStorage
 from pyrogram_patch.fsm.context_manager import FSMContextManager
+from pyrogram_patch.middlewares.middleware_manager import MiddlewareManager
 
 logger = logging.getLogger("pyrogram_patch.patch_data_pool")
 
+
 class PooledHelperData(BaseModel):
     """Pydantic model for pooled helper metadata validation."""
+
     key: str
     helper_id: int  # ID of the helper for reference
     timestamp: float
@@ -55,7 +66,6 @@ class PatchDataPool:
     pyrogram_patch_middlewares: list = []
     pyrogram_patch_fsm_storage: Optional[BaseStorage] = None
 
-
     @classmethod
     async def get_instance(cls) -> "PatchDataPool":
         """Async get the singleton instance."""
@@ -84,7 +94,7 @@ class PatchDataPool:
         self,
         update: Update,
         helper: ph.PatchHelper,
-        client: Optional[Client]=None
+        client: Optional[Client] = None,
     ) -> None:
         """
         Include a PatchHelper in the pool for the given update.
@@ -104,9 +114,7 @@ class PatchDataPool:
         else:
             key = await ph.create_key(update, client)
         pooled_data = PooledHelperData(
-            key=key,
-            helper_id=id(helper),
-            timestamp=time.time()
+            key=key, helper_id=id(helper), timestamp=time.time()
         )
         async with self._lock:
             if key in self._helpers:
@@ -118,7 +126,9 @@ class PatchDataPool:
                 self._helpers[key] = pooled_data
                 self._helper_refs[key] = weakref.ref(helper)
 
-    async def exclude_helper_from_pool(self, update: Update, client: Optional[Client]=None) -> bool:
+    async def exclude_helper_from_pool(
+        self, update: Update, client: Optional[Client] = None
+    ) -> bool:
         """
         Remove a PatchHelper from the pool.
 
@@ -144,7 +154,9 @@ class PatchDataPool:
                 return True
             return False
 
-    async def get_helper_from_pool(self, update: Update, client: Client) -> ph.PatchHelper:
+    async def get_helper_from_pool(
+        self, update: Update, client: Client
+    ) -> ph.PatchHelper:
         """
         Get a PatchHelper from the pool or create a new one.
 
@@ -164,9 +176,7 @@ class PatchDataPool:
             new_helper = ph.PatchHelper()
             self._helper_refs[key] = weakref.ref(new_helper)
             pooled_data = PooledHelperData(
-                key=key,
-                helper_id=id(new_helper),
-                timestamp=time.time()
+                key=key, helper_id=id(new_helper), timestamp=time.time()
             )
             self._helpers[key] = pooled_data
             return new_helper
@@ -185,7 +195,7 @@ class PatchDataPool:
             raise ValidationError(
                 field="storage",
                 value=type(storage).__name__,
-                expected="BaseStorage subclass"
+                expected="BaseStorage subclass",
             )
         self._fsm_storage = storage
         # Initialize FSMContextManager
@@ -199,10 +209,7 @@ class PatchDataPool:
 
     # Middleware integration
     async def add_middleware(
-        self,
-        middleware: Any,
-        kind: str = "before",
-        priority: int = 0
+        self, middleware: Any, kind: str = "before", priority: int = 0
     ) -> str:
         """
         Add middleware via the integrated manager.
@@ -222,11 +229,17 @@ class PatchDataPool:
         if not callable(middleware):
             raise ValueError("Middleware must be callable")
         if kind == "around":
-            return await self._middleware_manager.add_around(middleware, priority=priority)
+            return await self._middleware_manager.add_around(
+                middleware, priority=priority
+            )
         elif kind == "before":
-            return await self._middleware_manager.add_before(middleware, priority=priority)
+            return await self._middleware_manager.add_before(
+                middleware, priority=priority
+            )
         elif kind == "after":
-            return await self._middleware_manager.add_after(middleware, priority=priority)
+            return await self._middleware_manager.add_after(
+                middleware, priority=priority
+            )
         else:
             raise MiddlewareError(f"Invalid middleware kind: {kind}")
 
@@ -256,8 +269,15 @@ class PatchDataPool:
         """
         # Compose around middlewares (higher priority first)
         around_mids = sorted(
-            [m for m in self._middleware_manager._middlewares if m.kind == "around"],
-            key=lambda x: (-x.priority, self._middleware_manager._middlewares.index(x))  # Higher priority first
+            [
+                m
+                for m in self._middleware_manager._middlewares
+                if m.kind == "around"
+            ],
+            key=lambda x: (
+                -x.priority,
+                self._middleware_manager._middlewares.index(x),
+            ),  # Higher priority first
         )
 
         current = core_handler
@@ -269,11 +289,23 @@ class PatchDataPool:
 
         return wrapped
 
-    async def execute_before_middlewares(self, update: Update, client: Client = None, patch_helper: 'ph.PatchHelper' = None) -> None:
+    async def execute_before_middlewares(
+        self,
+        update: Update,
+        client: Client = None,
+        patch_helper: "ph.PatchHelper" = None,
+    ) -> None:
         """Execute before middlewares in priority order."""
         before_mids = sorted(
-            [m for m in self._middleware_manager._middlewares if m.kind == "before"],
-            key=lambda x: (-x.priority, self._middleware_manager._middlewares.index(x))
+            [
+                m
+                for m in self._middleware_manager._middlewares
+                if m.kind == "before"
+            ],
+            key=lambda x: (
+                -x.priority,
+                self._middleware_manager._middlewares.index(x),
+            ),
         )
         for mid in before_mids:
             # Try to call with different signatures to support various middleware types
@@ -294,8 +326,15 @@ class PatchDataPool:
     async def execute_after_middlewares(self, update: Update) -> None:
         """Execute after middlewares in priority order."""
         after_mids = sorted(
-            [m for m in self._middleware_manager._middlewares if m.kind == "after"],
-            key=lambda x: (-x.priority, self._middleware_manager._middlewares.index(x))
+            [
+                m
+                for m in self._middleware_manager._middlewares
+                if m.kind == "after"
+            ],
+            key=lambda x: (
+                -x.priority,
+                self._middleware_manager._middlewares.index(x),
+            ),
         )
         for mid in after_mids:
             await mid.fn(update)
@@ -304,7 +343,10 @@ class PatchDataPool:
 # Global pool initialization
 global_pool: Optional[PatchDataPool] = None
 
-async def initialize_global_pool(client: Optional[Client] = None) -> PatchDataPool:
+
+async def initialize_global_pool(
+    client: Optional[Client] = None,
+) -> PatchDataPool:
     """Async initialization of the global pool.
 
     Args:

@@ -1,27 +1,33 @@
-"""
-pyrogram_patch.errors
-Improved error types, helpers and decorators for pyrogram_patch.
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+#
+# pyrogram_patch.errors
+# Improved error types, helpers and decorators for pyrogram_patch.
 
-Goals:
-- Provide clear exception hierarchy for dispatcher, middleware, fsm, storage, patching and compatibility errors.
-- Capture rich traceback/context info in a JSON-able way.
-- Provide helpers/decorators to wrap sync/async call sites and re-raise structured exceptions.
-- Play nicely with async code (no blocking operations), and with logging frameworks.
-"""
+# Goals:
+# - Provide clear exception hierarchy for dispatcher, middleware, fsm, storage, patching and compatibility errors.
+# - Capture rich traceback/context info in a JSON-able way.
+# - Provide helpers/decorators to wrap sync/async call sites and re-raise structured exceptions.
+# - Play nicely with async code (no blocking operations), and with logging frameworks.
 
 from __future__ import annotations
 
 import hashlib
 import inspect
 import json
-import logging
 import linecache
-import sys
+import logging
 import traceback
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Tuple, Type, Union, cast, Coroutine
+from typing import Any, Callable, Dict, Optional, Type
 
 # Configure module logger (library users can reconfigure root or module logger)
 logger = logging.getLogger("pyrogram_patch")
@@ -70,7 +76,11 @@ def capture_trace(skip: int = 0) -> Optional[TraceInfo]:
         code_line = linecache.getline(filename, lineno).strip()
         stack = "".join(traceback.format_stack(limit=50))
         return TraceInfo(
-            file=filename, line=lineno, function=function, code=code_line, stack=stack
+            file=filename,
+            line=lineno,
+            function=function,
+            code=code_line,
+            stack=stack,
         )
     except Exception:
         # Never raise from trace capture - best-effort only
@@ -151,7 +161,9 @@ class PyrogramPatchError(Exception):
         return json.dumps(self.to_dict(), indent=indent, default=str)
 
     def short_log_line(self) -> str:
-        trace_info = f"{self.trace.file}:{self.trace.line}" if self.trace else "unknown"
+        trace_info = (
+            f"{self.trace.file}:{self.trace.line}" if self.trace else "unknown"
+        )
         return f"[{self.error_id}] {self.error_code}: {self.message} @ {trace_info}"
 
     def get_help_message(self) -> str:
@@ -182,6 +194,7 @@ class PyrogramPatchError(Exception):
 
 # ---- Specific exception types tailored for pyrogram_patch ----
 
+
 class ValidationError(PyrogramPatchError):
     def __init__(
         self,
@@ -190,12 +203,18 @@ class ValidationError(PyrogramPatchError):
         expected: Optional[str] = None,
         **kwargs,
     ):
-        message = f"Validation failed for field '{field}': got {type(value).__name__}"
+        message = (
+            f"Validation failed for field '{field}': got {type(value).__name__}"
+        )
         if expected:
             message += f", expected {expected}"
         context = kwargs.pop("context", {})
-        context.update({"field": field, "value": repr(value), "expected": expected})
-        super().__init__(message, error_code="VALIDATION_ERROR", context=context, **kwargs)
+        context.update(
+            {"field": field, "value": repr(value), "expected": expected}
+        )
+        super().__init__(
+            message, error_code="VALIDATION_ERROR", context=context, **kwargs
+        )
 
     def get_help_message(self) -> str:
         return (
@@ -241,10 +260,18 @@ class LockError(PyrogramPatchError):
 
 
 class RedisStorageError(PyrogramPatchError):
-    def __init__(self, message: str, *, context: Optional[Dict[str, Any]] = None, **kwargs):
+    def __init__(
+        self,
+        message: str,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
         ctx = context or {}
         ctx.setdefault("backend", "redis")
-        super().__init__(message, error_code="REDIS_STORAGE_ERROR", context=ctx, **kwargs)
+        super().__init__(
+            message, error_code="REDIS_STORAGE_ERROR", context=ctx, **kwargs
+        )
 
     def get_help_message(self) -> str:
         return (
@@ -259,7 +286,9 @@ class FSMTransitionError(PyrogramPatchError):
         ctx = kwargs.pop("context", {}) or {}
         if state:
             ctx["state"] = state
-        super().__init__(message, error_code="FSM_TRANSITION_ERROR", context=ctx, **kwargs)
+        super().__init__(
+            message, error_code="FSM_TRANSITION_ERROR", context=ctx, **kwargs
+        )
 
     def get_help_message(self) -> str:
         return (
@@ -269,11 +298,15 @@ class FSMTransitionError(PyrogramPatchError):
 
 
 class MiddlewareError(PyrogramPatchError):
-    def __init__(self, message: str, *, middleware: Optional[str] = None, **kwargs):
+    def __init__(
+        self, message: str, *, middleware: Optional[str] = None, **kwargs
+    ):
         ctx = kwargs.pop("context", {}) or {}
         if middleware:
             ctx["middleware"] = middleware
-        super().__init__(message, error_code="MIDDLEWARE_ERROR", context=ctx, **kwargs)
+        super().__init__(
+            message, error_code="MIDDLEWARE_ERROR", context=ctx, **kwargs
+        )
 
     def get_help_message(self) -> str:
         return (
@@ -291,11 +324,15 @@ class RouterError(PyrogramPatchError):
 
 
 class UpstreamCompatibilityError(PyrogramPatchError):
-    def __init__(self, message: str, *, upstream_version: Optional[str] = None, **kwargs):
+    def __init__(
+        self, message: str, *, upstream_version: Optional[str] = None, **kwargs
+    ):
         ctx = kwargs.pop("context", {}) or {}
         if upstream_version:
             ctx["upstream_version"] = upstream_version
-        super().__init__(message, error_code="UPSTREAM_COMPAT", context=ctx, **kwargs)
+        super().__init__(
+            message, error_code="UPSTREAM_COMPAT", context=ctx, **kwargs
+        )
 
     def get_help_message(self) -> str:
         return (
@@ -311,8 +348,11 @@ class DeprecationNotice(PyrogramPatchError, DeprecationWarning):
     def get_help_message(self) -> str:
         return f"Deprecated: {self.message}"
 
+
 class AsyncHandlerRequiredError(RouterError):
-    def __init__(self, message: str = "Handler must be an async function", **kwargs):
+    def __init__(
+        self, message: str = "Handler must be an async function", **kwargs
+    ):
         super().__init__(message, error_code="ASYNC_HANDLER_REQUIRED", **kwargs)
 
     def get_help_message(self) -> str:
@@ -321,9 +361,12 @@ class AsyncHandlerRequiredError(RouterError):
             "Convert your handler to 'async def handler(client, event):'."
         )
 
+
 class HandlerRegistrationError(RouterError):
     def __init__(self, message: str, **kwargs):
-        super().__init__(message, error_code="HANDLER_REGISTRATION_ERROR", **kwargs)
+        super().__init__(
+            message, error_code="HANDLER_REGISTRATION_ERROR", **kwargs
+        )
 
     def get_help_message(self) -> str:
         return (
@@ -332,9 +375,34 @@ class HandlerRegistrationError(RouterError):
         )
 
 
-# ---- Helper decorators to rewrap exceptions with structured types ----
+class FSMContextError(PyrogramPatchError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "FSM_CONTEXT_ERROR",
+        context: Optional[Dict[str, Any]] = None,
+        trace: Optional[TraceInfo] = None,
+        cause: Optional[BaseException] = None,
+    ):
+        super().__init__(
+            message,
+            error_code=error_code,
+            context=context,
+            trace=trace,
+            cause=cause,
+        )
 
-def _wrap_exception(exc_type: Type[PyrogramPatchError], message: Optional[str], **wrap_kwargs):
+    def get_help_message(self) -> str:
+        return (
+            "FSMContext error. Ensure the identifier is valid and the storage is initialized. "
+            "Check your FSMContext usage and storage configuration."
+        )
+
+
+def _wrap_exception(
+    exc_type: Type[PyrogramPatchError], message: Optional[str], **wrap_kwargs
+):
     """
     Factory returning a decorator that wraps exceptions in the given exc_type.
     """
@@ -350,10 +418,18 @@ def _wrap_exception(exc_type: Type[PyrogramPatchError], message: Optional[str], 
                     # Don't double-wrap if already our structured exception
                     raise
                 except Exception as e:
-                    msg = message or f"Unhandled exception in {func.__name__}: {e}"
+                    msg = (
+                        message
+                        or f"Unhandled exception in {func.__name__}: {e}"
+                    )
                     # capture trace from caller frame
                     trace = capture_trace(skip=1)
-                    raise exc_type(msg, cause=e, trace=trace, context=wrap_kwargs.get("context")) from e
+                    raise exc_type(
+                        msg,
+                        cause=e,
+                        trace=trace,
+                        context=wrap_kwargs.get("context"),
+                    ) from e
 
             return async_wrapper
         else:
@@ -365,9 +441,17 @@ def _wrap_exception(exc_type: Type[PyrogramPatchError], message: Optional[str], 
                 except PyrogramPatchError:
                     raise
                 except Exception as e:
-                    msg = message or f"Unhandled exception in {func.__name__}: {e}"
+                    msg = (
+                        message
+                        or f"Unhandled exception in {func.__name__}: {e}"
+                    )
                     trace = capture_trace(skip=1)
-                    raise exc_type(msg, cause=e, trace=trace, context=wrap_kwargs.get("context")) from e
+                    raise exc_type(
+                        msg,
+                        cause=e,
+                        trace=trace,
+                        context=wrap_kwargs.get("context"),
+                    ) from e
 
             return sync_wrapper
 
@@ -390,8 +474,6 @@ def wrap_with_middleware_error(message: Optional[str] = None, **ctx):
     return _wrap_exception(MiddlewareError, message, **ctx)
 
 
-# ---- Small utilities ----
-
 def safe_dict(obj: Any) -> Dict[str, Any]:
     """
     Try to convert an object to a JSON safe dict for logging/context.
@@ -400,32 +482,16 @@ def safe_dict(obj: Any) -> Dict[str, Any]:
         if isinstance(obj, dict):
             return obj
         if hasattr(obj, "__dict__"):
-            return {k: safe_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+            return {
+                k: safe_dict(v)
+                for k, v in vars(obj).items()
+                if not k.startswith("_")
+            }
         return {"value": repr(obj)}
     except Exception:
         return {"value": "<unserializable>"}
 
 
-# ---- Example helpers / usage snippets (for docs/tests) ----
-
-_example_usage = """
-Example:
-
-from pyrogram_patch.errors import wrap_with_dispatcher_error, DispatcherError
-
-@wrap_with_dispatcher_error("Error while handling update")
-async def handle_update(update):
-    # your handler code that may raise arbitrary exceptions
-    ...
-
-try:
-    await handle_update(some_update)
-except DispatcherError as e:
-    print("Structured dispatcher error:", e.error_id)
-    e.log_report()
-"""
-
-# Expose public API
 __all__ = [
     "TraceInfo",
     "capture_trace",

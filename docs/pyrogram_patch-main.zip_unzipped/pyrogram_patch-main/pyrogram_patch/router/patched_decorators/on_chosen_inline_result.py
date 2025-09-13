@@ -24,7 +24,9 @@ import pyrogram_patch
 
 
 class OnChosenInlineResult:
-    def on_chosen_inline_result(self=None, filters=None, group: int = 0) -> Callable:
+    def on_chosen_inline_result(
+        self=None, filters=None, group: int = 0
+    ) -> Callable:
         """Decorator for handling chosen inline results.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
@@ -43,10 +45,20 @@ class OnChosenInlineResult:
             if isinstance(self, pyrogram_patch.router.Router):
                 if self._app is not None:
                     self._app.add_handler(
-                        pyrogram.handlers.ChosenInlineResultHandler(func, filters), group
+                        pyrogram.handlers.ChosenInlineResultHandler(
+                            func, filters
+                        ),
+                        group,
                     )
                 else:
-                    self._decorators_storage.append((pyrogram.handlers.ChosenInlineResultHandler(func, filters), group))
+                    self._decorators_storage.append(
+                        (
+                            pyrogram.handlers.ChosenInlineResultHandler(
+                                func, filters
+                            ),
+                            group,
+                        )
+                    )
             else:
                 raise RuntimeError(
                     "you should only use this in routers, and only as a decorator"

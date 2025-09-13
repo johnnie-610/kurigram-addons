@@ -6,13 +6,13 @@
 #
 # For the full copyright and license information, please view the LICENSE
 # file that was distributed with this source code
+#
+# Factory module for creating Pyrogram event decorators.
+#
+# This module provides a clean, type-safe implementation for creating decorator methods
+# that can be used with the Router class. It includes proper validation, error handling,
+# and handler management.
 
-"""Factory module for creating Pyrogram event decorators.
-
-This module provides a clean, type-safe implementation for creating decorator methods
-that can be used with the Router class. It includes proper validation, error handling,
-and handler management.
-"""
 
 from __future__ import annotations
 
@@ -21,17 +21,16 @@ import inspect
 import logging
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
-# Type definitions
-T = TypeVar('T', bound=Callable[..., Any])
+T = TypeVar("T", bound=Callable[..., Any])
 HandlerTuple = tuple[Any, int]  # (handler_instance, group)
 
-# Optional pyrogram imports with proper fallbacks
 try:
     import pyrogram
+    import pyrogram.handlers as handlers_module
     from pyrogram import Client
     from pyrogram.filters import Filter as PyrogramFilter
     from pyrogram.handlers.handler import Handler as PyrogramHandlerBase
-    import pyrogram.handlers as handlers_module
+
     PYROGRAM_AVAILABLE = True
 except ImportError:
     pyrogram = None
@@ -43,13 +42,18 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 class HandlerRegistrationError(Exception):
     """Raised when handler registration fails."""
+
     pass
+
 
 class InvalidFilterError(TypeError):
     """Raised when invalid filters are provided."""
+
     pass
+
 
 def get_handler_class(handler_name: str) -> Optional[Type[PyrogramHandlerBase]]:
     """Get handler class from pyrogram.handlers module.
@@ -65,6 +69,7 @@ def get_handler_class(handler_name: str) -> Optional[Type[PyrogramHandlerBase]]:
 
     return getattr(handlers_module, handler_name, None)
 
+
 def validate_filters(filters: Any) -> None:
     """Validate that filters are of acceptable types.
 
@@ -79,12 +84,23 @@ def validate_filters(filters: Any) -> None:
 
     # Import state filters if available
     try:
-        from pyrogram_patch.fsm.filter import StateFilter, NoStateFilter, AnyStateFilter, CombinedFilter
-        state_filter_types = (StateFilter, NoStateFilter, AnyStateFilter, CombinedFilter)
+        from pyrogram_patch.fsm.filter import (AnyStateFilter, CombinedFilter,
+                                               NoStateFilter, StateFilter)
+
+        state_filter_types = (
+            StateFilter,
+            NoStateFilter,
+            AnyStateFilter,
+            CombinedFilter,
+        )
     except ImportError:
         state_filter_types = ()
 
-    valid_types = (PyrogramFilter,) + state_filter_types if PYROGRAM_AVAILABLE else state_filter_types
+    valid_types = (
+        (PyrogramFilter,) + state_filter_types
+        if PYROGRAM_AVAILABLE
+        else state_filter_types
+    )
 
     if not isinstance(filters, valid_types):
         raise InvalidFilterError(
@@ -92,10 +108,11 @@ def validate_filters(filters: Any) -> None:
             f"Got {type(filters).__name__}"
         )
 
+
 def create_handler_instance(
     handler_class: Type[PyrogramHandlerBase],
     callback: Callable,
-    filters: Optional[Any]
+    filters: Optional[Any],
 ) -> PyrogramHandlerBase:
     """Create a handler instance with proper error handling.
 
@@ -117,7 +134,9 @@ def create_handler_instance(
         if filters is not None:
             # Try without filters as fallback
             try:
-                logger.warning(f"Handler {handler_class.__name__} doesn't support filters, ignoring")
+                logger.warning(
+                    f"Handler {handler_class.__name__} doesn't support filters, ignoring"
+                )
                 return handler_class(callback)
             except TypeError:
                 pass
@@ -126,12 +145,13 @@ def create_handler_instance(
             f"Failed to create {handler_class.__name__}: {e}"
         ) from e
 
+
 def create_decorator_method(
     handler_class_name: str,
     event_description: str,
     callback_signature: str,
     event_parameter: str,
-    event_type: str
+    event_type: str,
 ) -> Callable:
     """Create a complete decorator method for a specific Pyrogram event.
 
@@ -150,7 +170,7 @@ def create_decorator_method(
     def decorator_method(
         self,
         filters: Optional[Union[PyrogramFilter, Any]] = None,
-        group: int = 0
+        group: int = 0,
     ) -> Callable[[T], T]:
         """The actual decorator method that gets attached to Router instances."""
 
@@ -164,7 +184,7 @@ def create_decorator_method(
                 f"Missing required attributes: _client or _store_handler_info"
             )
 
-        # Validate filters early
+        # Validate filters
         validate_filters(filters)
 
         def decorator(func: T) -> T:
@@ -190,22 +210,36 @@ def create_decorator_method(
             # Always try to register or store the handler
             if handler_class is not None and PYROGRAM_AVAILABLE:
                 # If client is already set, register immediately
-                if hasattr(self, '_client') and self._client is not None:
+                if hasattr(self, "_client") and self._client is not None:
                     try:
-                        handler = create_handler_instance(handler_class, wrapper, filters)
+                        handler = create_handler_instance(
+                            handler_class, wrapper, filters
+                        )
                         self._register_handler(handler, group)
-                        logger.debug(f"Immediately registered handler {func.__name__}")
+                        logger.debug(
+                            f"Immediately registered handler {func.__name__}"
+                        )
                     except HandlerRegistrationError as e:
-                        logger.error(f"Failed to register handler {func.__name__}: {e}")
+                        logger.error(
+                            f"Failed to register handler {func.__name__}: {e}"
+                        )
                         raise
                 else:
                     # Store for later registration when client is set
-                    self._store_handler_info(handler_class_name, wrapper, filters, group)
-                    logger.debug(f"Stored handler {func.__name__} for later registration")
+                    self._store_handler_info(
+                        handler_class_name, wrapper, filters, group
+                    )
+                    logger.debug(
+                        f"Stored handler {func.__name__} for later registration"
+                    )
             else:
                 # Pyrogram not available, store for later
-                logger.debug(f"Pyrogram not available, storing handler for later: {func.__name__}")
-                self._store_handler_info(handler_class_name, wrapper, filters, group)
+                logger.debug(
+                    f"Pyrogram not available, storing handler for later: {func.__name__}"
+                )
+                self._store_handler_info(
+                    handler_class_name, wrapper, filters, group
+                )
 
             return func  # Return original function, not wrapper
 
@@ -245,25 +279,22 @@ Raises:
 
     # Set up method signature for better IDE support
     parameters = [
-        inspect.Parameter('self', inspect.Parameter.POSITIONAL_OR_KEYWORD),
+        inspect.Parameter("self", inspect.Parameter.POSITIONAL_OR_KEYWORD),
         inspect.Parameter(
-            'filters',
+            "filters",
             inspect.Parameter.KEYWORD_ONLY,
             default=None,
-            annotation=Optional[Union[PyrogramFilter, Any]]
+            annotation=Optional[Union[PyrogramFilter, Any]],
         ),
         inspect.Parameter(
-            'group',
-            inspect.Parameter.KEYWORD_ONLY,
-            default=0,
-            annotation=int
-        )
+            "group", inspect.Parameter.KEYWORD_ONLY, default=0, annotation=int
+        ),
     ]
     decorator_method.__signature__ = inspect.Signature(parameters)
     decorator_method.__annotations__ = {
-        'filters': Optional[Union[PyrogramFilter, Any]],
-        'group': int,
-        'return': Callable[[T], T]
+        "filters": Optional[Union[PyrogramFilter, Any]],
+        "group": int,
+        "return": Callable[[T], T],
     }
 
     return decorator_method

@@ -42,10 +42,16 @@ class OnUserStatus:
                 if self._app is not None:
 
                     self._app.add_handler(
-                        pyrogram.handlers.UserStatusHandler(func, filters), group
+                        pyrogram.handlers.UserStatusHandler(func, filters),
+                        group,
                     )
                 else:
-                    self._decorators_storage.append((pyrogram.handlers.UserStatusHandler(func, filters), group))
+                    self._decorators_storage.append(
+                        (
+                            pyrogram.handlers.UserStatusHandler(func, filters),
+                            group,
+                        )
+                    )
             else:
                 raise RuntimeError(
                     "you should only use this in routers, and only as a decorator"

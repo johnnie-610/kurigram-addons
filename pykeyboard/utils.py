@@ -7,8 +7,8 @@
 #
 # pykeyboard/utils.py
 
-import sys
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Union
 
@@ -27,6 +27,7 @@ except ImportError:
     pickle = None
 
 logger = logging.getLogger("pykeyboard.utils")
+
 
 def get_python_version() -> tuple[int, int, int]:
     """Get the current Python version as a tuple.

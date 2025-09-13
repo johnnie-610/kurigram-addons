@@ -21,6 +21,7 @@ T = TypeVar("T", bound=KeyboardBase)
 
 logger = logging.getLogger("pykeyboard.builder")
 
+
 class KeyboardBuilder:
     """Fluent API builder for type-safe keyboard construction.
 

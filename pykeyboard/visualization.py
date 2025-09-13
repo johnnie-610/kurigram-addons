@@ -17,6 +17,7 @@ from .reply_keyboard import ReplyKeyboard
 
 logger = logging.getLogger("pykeyboard.visualization")
 
+
 class KeyboardVisualizer:
     """Advanced keyboard visualization and debugging utilities.
 

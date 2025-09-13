@@ -6,23 +6,25 @@
 #
 # For the full copyright and license information, please view the LICENSE
 # file that was distributed with this source code
+#
+# Router module for managing Pyrogram event handlers.
+#
+# This module provides the main Router class that manages Pyrogram event handlers
+# with a clean, decorator-based interface. It handles both immediate registration
+# when a client is available and deferred registration for later setup.
 
-"""Router module for managing Pyrogram event handlers.
-
-This module provides the main Router class that manages Pyrogram event handlers
-with a clean, decorator-based interface. It handles both immediate registration
-when a client is available and deferred registration for later setup.
-"""
 
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from pyrogram_patch.router.patched_decorators.decorators import PatchedDecorators
+from pyrogram_patch.router.patched_decorators.decorators import \
+    PatchedDecorators
 
 # Type imports with fallbacks
 try:
     from pyrogram import Client
     from pyrogram.handlers.handler import Handler as PyrogramHandler
+
     PYROGRAM_AVAILABLE = True
 except ImportError:
     Client = object
@@ -32,8 +34,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Type aliases
-HandlerInfo = Tuple[str, Any, Optional[Any], int]  # (class_name, callback, filters, group)
+HandlerInfo = Tuple[
+    str, Any, Optional[Any], int
+]  # (class_name, callback, filters, group)
 HandlerEntry = Tuple[PyrogramHandler, int]  # (handler, group)
+
 
 class Router(PatchedDecorators):
     """A router class for managing Pyrogram event handlers with decorators.
@@ -88,9 +93,9 @@ class Router(PatchedDecorators):
 
         # Statistics
         self._registration_stats: Dict[str, int] = {
-            'registered': 0,
-            'failed': 0,
-            'duplicates_prevented': 0
+            "registered": 0,
+            "failed": 0,
+            "duplicates_prevented": 0,
         }
 
         logger.debug("Router initialized")
@@ -122,11 +127,11 @@ class Router(PatchedDecorators):
             Dictionary containing registration statistics and handler counts
         """
         return {
-            'registered_handlers': len(self._registered_handlers),
-            'pending_handlers': len(self._pending_handlers),
-            'client_attached': self._client is not None,
-            'is_registered': self._is_registered,
-            **self._registration_stats
+            "registered_handlers": len(self._registered_handlers),
+            "pending_handlers": len(self._pending_handlers),
+            "client_attached": self._client is not None,
+            "is_registered": self._is_registered,
+            **self._registration_stats,
         }
 
     def set_client(self, client: Client) -> None:
@@ -146,7 +151,9 @@ class Router(PatchedDecorators):
         if not PYROGRAM_AVAILABLE:
             raise RuntimeError("Pyrogram is not available")
 
-        if not hasattr(client, 'add_handler') or not hasattr(client, 'remove_handler'):
+        if not hasattr(client, "add_handler") or not hasattr(
+            client, "remove_handler"
+        ):
             raise TypeError(
                 f"Expected a Pyrogram Client with add_handler/remove_handler methods, "
                 f"got {type(client).__name__}"
@@ -187,7 +194,9 @@ class Router(PatchedDecorators):
                 failed_removals += 1
 
         removed_count = len(self._registered_handlers) - failed_removals
-        logger.info(f"Unregistered {removed_count} handlers ({failed_removals} failed)")
+        logger.info(
+            f"Unregistered {removed_count} handlers ({failed_removals} failed)"
+        )
 
         self._is_registered = False
 
@@ -207,7 +216,9 @@ class Router(PatchedDecorators):
         self._pending_handlers.clear()
         self._handler_ids.clear()
 
-        logger.info(f"Cleared {cleared_registered} registered and {cleared_pending} pending handlers")
+        logger.info(
+            f"Cleared {cleared_registered} registered and {cleared_pending} pending handlers"
+        )
 
     def _register_handler(self, handler: PyrogramHandler, group: int) -> None:
         """Register a single handler with the client.
@@ -222,7 +233,7 @@ class Router(PatchedDecorators):
         # Prevent duplicate handlers
         handler_id = id(handler)
         if handler_id in self._handler_ids:
-            self._registration_stats['duplicates_prevented'] += 1
+            self._registration_stats["duplicates_prevented"] += 1
             logger.debug("Prevented duplicate handler registration")
             return
 
@@ -231,10 +242,12 @@ class Router(PatchedDecorators):
                 self._client.add_handler(handler, group)
                 self._registered_handlers.append((handler, group))
                 self._handler_ids.add(handler_id)
-                self._registration_stats['registered'] += 1
-                logger.debug(f"Registered {type(handler).__name__} to group {group}")
+                self._registration_stats["registered"] += 1
+                logger.debug(
+                    f"Registered {type(handler).__name__} to group {group}"
+                )
             except Exception as e:
-                self._registration_stats['failed'] += 1
+                self._registration_stats["failed"] += 1
                 logger.error(f"Failed to register handler: {e}")
                 raise RuntimeError(f"Handler registration failed: {e}") from e
         else:
@@ -245,7 +258,7 @@ class Router(PatchedDecorators):
         handler_class_name: str,
         callback: Any,
         filters: Optional[Any],
-        group: int
+        group: int,
     ) -> None:
         """Store handler information for later registration.
 
@@ -268,20 +281,32 @@ class Router(PatchedDecorators):
         registered = 0
         failed = 0
 
-        for handler_class_name, callback, filters, group in self._pending_handlers:
+        for (
+            handler_class_name,
+            callback,
+            filters,
+            group,
+        ) in self._pending_handlers:
             try:
                 # Get handler class directly from pyrogram.handlers
                 if not PYROGRAM_AVAILABLE:
-                    logger.error("Pyrogram not available for handler registration")
+                    logger.error(
+                        "Pyrogram not available for handler registration"
+                    )
                     failed += 1
                     continue
 
                 # Import handlers module dynamically
                 import pyrogram.handlers as handlers_module
-                handler_class = getattr(handlers_module, handler_class_name, None)
+
+                handler_class = getattr(
+                    handlers_module, handler_class_name, None
+                )
 
                 if handler_class is None:
-                    logger.error(f"Handler class not found: {handler_class_name}")
+                    logger.error(
+                        f"Handler class not found: {handler_class_name}"
+                    )
                     failed += 1
                     continue
 
@@ -293,7 +318,9 @@ class Router(PatchedDecorators):
                     try:
                         handler = handler_class(callback)
                     except Exception as e:
-                        logger.error(f"Failed to create handler {handler_class_name}: {e}")
+                        logger.error(
+                            f"Failed to create handler {handler_class_name}: {e}"
+                        )
                         failed += 1
                         continue
 
@@ -301,13 +328,17 @@ class Router(PatchedDecorators):
                 registered += 1
 
             except Exception as e:
-                logger.error(f"Failed to register pending handler {handler_class_name}: {e}")
+                logger.error(
+                    f"Failed to register pending handler {handler_class_name}: {e}"
+                )
                 failed += 1
 
         # Clear pending handlers after registration attempt
         self._pending_handlers.clear()
 
-        logger.info(f"Registered {registered} pending handlers ({failed} failed)")
+        logger.info(
+            f"Registered {registered} pending handlers ({failed} failed)"
+        )
 
     def __repr__(self) -> str:
         """Return string representation of the router."""
@@ -319,7 +350,7 @@ class Router(PatchedDecorators):
             f"registered={self._is_registered})"
         )
 
-    def __enter__(self) -> 'Router':
+    def __enter__(self) -> "Router":
         """Context manager entry."""
         return self
 

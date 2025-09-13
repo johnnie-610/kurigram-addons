@@ -1,5 +1,9 @@
-x = {"a": 1, "b": 2, "c": 3}
-
-x.update({"d": 4})
-
-print(x)
+"""
+- on_pre_checkout_query()
+- on_purchased_paid_media()
+- on_shipping_query()
+- on_start()
+- on_stop()
+- on_connect()
+- on_disconnect()
+"""

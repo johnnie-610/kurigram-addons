@@ -1,10 +1,17 @@
-# pyrogram_patch/fsm/base_storage.py
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
+
 from __future__ import annotations
 
 import abc
 from typing import Any, Dict, Optional, Protocol
-
-from pyrogram_patch import errors
 
 
 class BaseStorage(abc.ABC):
@@ -39,7 +46,13 @@ class BaseStorage(abc.ABC):
 
     # ---- core API -----------------------------------------------------
     @abc.abstractmethod
-    async def set_state(self, identifier: str, state: Dict[str, Any], *, ttl: Optional[int] = None) -> None:
+    async def set_state(
+        self,
+        identifier: str,
+        state: Dict[str, Any],
+        *,
+        ttl: Optional[int] = None,
+    ) -> None:
         """Persist the state for `identifier`.
 
         Args:
@@ -69,7 +82,6 @@ class BaseStorage(abc.ABC):
             errors.PyrogramPatchError on failure.
         """
         raise NotImplementedError
-
 
     @abc.abstractmethod
     async def compare_and_set(
@@ -123,14 +135,17 @@ class BaseStorage(abc.ABC):
 class BaseStorageProtocol(Protocol):
     """Protocol describing the async storage shape for static typing."""
 
-    async def set_state(self, identifier: str, state: Dict[str, Any], *, ttl: Optional[int] = None) -> None:
-        ...
+    async def set_state(
+        self,
+        identifier: str,
+        state: Dict[str, Any],
+        *,
+        ttl: Optional[int] = None,
+    ) -> None: ...
 
-    async def get_state(self, identifier: str) -> Optional[Dict[str, Any]]:
-        ...
+    async def get_state(self, identifier: str) -> Optional[Dict[str, Any]]: ...
 
-    async def delete_state(self, identifier: str) -> bool:
-        ...
+    async def delete_state(self, identifier: str) -> bool: ...
 
     async def compare_and_set(
         self,
@@ -139,11 +154,8 @@ class BaseStorageProtocol(Protocol):
         *,
         expected_state: Optional[Dict[str, Any]] = None,
         ttl: Optional[int] = None,
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
-    async def list_keys(self, pattern: str = "*") -> list[str]:
-        ...
+    async def list_keys(self, pattern: str = "*") -> list[str]: ...
 
-    async def clear_namespace(self) -> int:
-        ...
+    async def clear_namespace(self) -> int: ...

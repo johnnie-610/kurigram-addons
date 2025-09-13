@@ -1,16 +1,26 @@
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
+
 import inspect
 import logging
-from contextlib import suppress
-from typing import Union
 
 import pyrogram
 from pyrogram.dispatcher import Dispatcher, log
 from pyrogram.handlers import RawUpdateHandler
-from .patch_data_pool import PatchDataPool, initialize_global_pool
-from pyrogram_patch.fsm import BaseStorage
+
 from pyrogram_patch.middlewares import PatchHelper
 
+from .patch_data_pool import initialize_global_pool
+
 logger = logging.getLogger("pyrogram_patch.dispatcher")
+
 
 class PatchedDispatcher(Dispatcher):
     def __init__(self, client: pyrogram.Client):
@@ -44,11 +54,15 @@ class PatchedDispatcher(Dispatcher):
                     continue
 
                 patch_helper = PatchHelper()
-                await self.pool.include_helper_to_pool(update=parsed_updates, helper=patch_helper)
+                await self.pool.include_helper_to_pool(
+                    update=parsed_updates, helper=patch_helper
+                )
 
                 if self.pool.pyrogram_patch_fsm_storage:
                     await patch_helper._include_state(
-                        parsed_updates, self.pool.pyrogram_patch_fsm_storage, self._client
+                        parsed_updates,
+                        self.pool.pyrogram_patch_fsm_storage,
+                        self._client,
                     )
 
                 # process outer middlewares
@@ -66,9 +80,15 @@ class PatchedDispatcher(Dispatcher):
                             if isinstance(handler, handler_type):
                                 try:
                                     # filtering event
-                                    if await handler.check(self._client, parsed_updates):
+                                    if await handler.check(
+                                        self._client, parsed_updates
+                                    ):
                                         # process middlewares
-                                        for middleware in self.pool.pyrogram_patch_middlewares:
+                                        for (
+                                            middleware
+                                        ) in (
+                                            self.pool.pyrogram_patch_middlewares
+                                        ):
                                             if middleware == type(handler):
                                                 await patch_helper._process_middleware(
                                                     parsed_updates,
@@ -78,33 +98,45 @@ class PatchedDispatcher(Dispatcher):
                                         args = (parsed_updates,)
                                 except Exception as e:
                                     log.exception(e)
-                                    await self.pool.exclude_helper_from_pool(parsed_updates, self._client)
+                                    await self.pool.exclude_helper_from_pool(
+                                        parsed_updates, self._client
+                                    )
                                     continue
 
                             elif isinstance(handler, RawUpdateHandler):
                                 try:
                                     # process middlewares
-                                    for middleware in self.pool.pyrogram_patch_middlewares:
+                                    for (
+                                        middleware
+                                    ) in self.pool.pyrogram_patch_middlewares:
                                         if middleware == type(handler):
                                             await patch_helper._process_middleware(
-                                                    parsed_updates,
-                                                    middleware,
-                                                    self._client,
-                                                )
+                                                parsed_updates,
+                                                middleware,
+                                                self._client,
+                                            )
                                     args = (update, users, chats)
                                 except pyrogram.StopPropagation:
-                                    await self.pool.exclude_helper_from_pool(parsed_updates, self._client)
+                                    await self.pool.exclude_helper_from_pool(
+                                        parsed_updates, self._client
+                                    )
                                     continue
                             if args is None:
                                 continue
 
                             try:
                                 # formation kwargs - using fixed signature processing
-                                kwargs = await patch_helper._get_data_for_handler(
-                                    handler.callback
+                                kwargs = (
+                                    await patch_helper._get_data_for_handler(
+                                        handler.callback
+                                    )
                                 )
-                                if inspect.iscoroutinefunction(handler.callback):
-                                    await handler.callback(self.client, *args, **kwargs)
+                                if inspect.iscoroutinefunction(
+                                    handler.callback
+                                ):
+                                    await handler.callback(
+                                        self.client, *args, **kwargs
+                                    )
                                 else:
                                     args_list = list(args)
                                     for v in kwargs.values():
@@ -114,7 +146,7 @@ class PatchedDispatcher(Dispatcher):
                                         self.client.executor,
                                         handler.callback,
                                         self.client,
-                                        *final_args
+                                        *final_args,
                                     )
                             except pyrogram.StopPropagation:
                                 raise
@@ -123,9 +155,13 @@ class PatchedDispatcher(Dispatcher):
                             except Exception as e:
                                 log.exception(e)
                             finally:
-                                await self.pool.exclude_helper_from_pool(parsed_updates, self._client)
+                                await self.pool.exclude_helper_from_pool(
+                                    parsed_updates, self._client
+                                )
                             break
-                    await self.pool.exclude_helper_from_pool(parsed_updates, self._client)
+                    await self.pool.exclude_helper_from_pool(
+                        parsed_updates, self._client
+                    )
             except pyrogram.StopPropagation:
                 pass
             except Exception as e:

@@ -24,7 +24,9 @@ import pyrogram_patch
 
 
 class OnChatJoinRequest:
-    def on_chat_join_request(self=None, filters=None, group: int = 0) -> Callable:
+    def on_chat_join_request(
+        self=None, filters=None, group: int = 0
+    ) -> Callable:
         """Decorator for handling chat join requests.
 
         This does the same thing as :meth:`~pyrogram.Client.add_handler` using the
@@ -42,10 +44,18 @@ class OnChatJoinRequest:
             if isinstance(self, pyrogram_patch.router.Router):
                 if self._app is not None:
                     self._app.add_handler(
-                        pyrogram.handlers.ChatJoinRequestHandler(func, filters), group
+                        pyrogram.handlers.ChatJoinRequestHandler(func, filters),
+                        group,
                     )
                 else:
-                    self._decorators_storage.append((pyrogram.handlers.ChatJoinRequestHandler(func, filters), group))
+                    self._decorators_storage.append(
+                        (
+                            pyrogram.handlers.ChatJoinRequestHandler(
+                                func, filters
+                            ),
+                            group,
+                        )
+                    )
             else:
                 raise RuntimeError(
                     "you should only use this in routers, and only as a decorator"

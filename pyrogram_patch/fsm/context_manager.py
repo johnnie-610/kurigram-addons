@@ -1,4 +1,12 @@
-# pyrogram_patch/fsm/context_manager.py
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
 from __future__ import annotations
 
 import logging
@@ -22,7 +30,12 @@ class FSMContextManager:
             await ctx.set_state("awaiting_input")
     """
 
-    def __init__(self, storage: Any, *, identifier_getter: Optional[Callable[[Any], str]] = None) -> None:
+    def __init__(
+        self,
+        storage: Any,
+        *,
+        identifier_getter: Optional[Callable[[Any], str]] = None,
+    ) -> None:
         """
         Args:
             storage: backend implementing set_state/get_state/delete_state/compare_and_set.
@@ -51,10 +64,16 @@ class FSMContextManager:
 
             if not identifier:
                 # Fallbacks
-                msg = getattr(update, "message", None) or (update.get("message") if isinstance(update, dict) else None)
-                chat = getattr(msg, "chat", None) or (msg.get("chat") if isinstance(msg, dict) else None)
+                msg = getattr(update, "message", None) or (
+                    update.get("message") if isinstance(update, dict) else None
+                )
+                chat = getattr(msg, "chat", None) or (
+                    msg.get("chat") if isinstance(msg, dict) else None
+                )
                 if chat:
-                    identifier = f"chat:{getattr(chat, 'id', None) or chat.get('id')}"
+                    identifier = (
+                        f"chat:{getattr(chat, 'id', None) or chat.get('id')}"
+                    )
                 else:
                     identifier = "global"
 
@@ -62,4 +81,8 @@ class FSMContextManager:
         except errors.PyrogramPatchError:
             raise
         except Exception as e:
-            raise errors.FSMContextError("Failed to create FSMContext", cause=e, context={"update": repr(update)}) from e
+            raise errors.FSMContextError(
+                "Failed to create FSMContext",
+                cause=e,
+                context={"update": repr(update)},
+            ) from e

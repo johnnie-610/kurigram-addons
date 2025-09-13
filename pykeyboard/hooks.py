@@ -16,6 +16,7 @@ from .reply_keyboard import ReplyKeyboard
 
 logger = logging.getLogger("pykeyboard.hooks")
 
+
 class ValidationHook(Protocol):
     """Protocol for validation hook functions."""
 
