@@ -28,10 +28,8 @@ pkgs.mkShell {
     echo ""
   '';
 
-  # Ensure poetry uses the correct Python version
   POETRY_PYTHON = "${pkgs.python3}/bin/python";
 
-  # Poetry configuration for better development experience
-  POETRY_VENV_IN_PROJECT = "1";  # Create .venv in project directory
-  POETRY_CACHE_DIR = ".poetry-cache";  # Local cache directory
+  POETRY_VENV_IN_PROJECT = "1";  # Create .venv in project dir
+  POETRY_CACHE_DIR = ".poetry-cache";  # Cache dir
 }

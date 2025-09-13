@@ -112,6 +112,7 @@ venv.bak/
 
 # DEV STUFF
 .poetry-cache
+x.py
 
 # Update handlers
 update_handlers.py
