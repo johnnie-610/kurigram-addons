@@ -301,6 +301,21 @@ class PatchHelper:
 
         return self._data
 
+    async def export_snapshot(self) -> PatchHelperData:
+        """Create a serialisable snapshot of the helper state."""
+
+        async with self._lock:
+            payload = PatchHelperData(state=self.state, data=self._data.copy())
+        return payload
+
+    async def apply_snapshot(self, snapshot: PatchHelperData) -> None:
+        """Load helper state from a previously exported snapshot."""
+
+        validated = PatchHelperData(**snapshot.model_dump())
+        self.state = validated.state
+        async with self._lock:
+            self._data = validated.data.copy()
+
     async def get(self, key: str, default: Any = None) -> Any:
         """Get a value from the helper's data."""
         async with self._lock:

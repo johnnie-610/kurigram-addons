@@ -1,7 +1,10 @@
 import asyncio
 
-import fakeredis.aioredis as aioredis
 import pytest
+
+aioredis = pytest.importorskip(
+    "fakeredis.aioredis", reason="fakeredis is required for redis storage tests"
+)
 
 from pyrogram_patch.fsm.redis_storage import RedisFSMStorage, RedisStorageConfig
 

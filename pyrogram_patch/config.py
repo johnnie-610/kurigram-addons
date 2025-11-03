@@ -34,6 +34,12 @@ class CircuitBreakerConfig(BaseSettings):
     timeout: float = Field(
         default=10.0, description="Operation timeout in seconds"
     )
+    fallback_message: str = Field(
+        default=(
+            "⚠️ We're experiencing temporary issues. Please try again in a moment."
+        ),
+        description="Message sent to end users when a circuit breaker is open",
+    )
 
     class Config:
         env_prefix = "PYROGRAM_PATCH_CB_"
@@ -65,6 +71,14 @@ class FSMConfig(BaseSettings):
     )
     cleanup_interval: float = Field(
         default=300.0, description="State cleanup interval in seconds"
+    )
+    helper_session_ttl: float = Field(
+        default=900.0,
+        description="Seconds to keep helper sessions in memory before cleanup",
+    )
+    persist_helpers: bool = Field(
+        default=False,
+        description="Persist helper snapshots to storage for session recovery",
     )
 
     class Config:
