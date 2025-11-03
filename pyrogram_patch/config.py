@@ -165,27 +165,27 @@ class PyrogramPatchConfig(BaseSettings):
         default=False, description="Enable telemetry collection"
     )
 
-    # Plugin settings
-    plugins: List[str] = Field(
-        default_factory=list, description="List of enabled plugins"
+    # Addon settings
+    addons: List[str] = Field(
+        default_factory=list, description="List of enabled addons"
     )
-    plugin_config: Dict[str, Any] = Field(
-        default_factory=dict, description="Plugin-specific configuration"
+    addon_config: Dict[str, Any] = Field(
+        default_factory=dict, description="Addon-specific configuration"
     )
 
     class Config:
         env_prefix = "PYROGRAM_PATCH_"
         case_sensitive = False
 
-    def get_plugin_config(self, plugin_name: str) -> Dict[str, Any]:
-        """Get configuration for a specific plugin."""
-        return self.plugin_config.get(plugin_name, {})
+    def get_addon_config(self, addon_name: str) -> Dict[str, Any]:
+        """Get configuration for a specific addon."""
+        return self.addon_config.get(addon_name, {})
 
-    def set_plugin_config(
-        self, plugin_name: str, config: Dict[str, Any]
+    def set_addon_config(
+        self, addon_name: str, config: Dict[str, Any]
     ) -> None:
-        """Set configuration for a specific plugin."""
-        self.plugin_config[plugin_name] = config
+        """Set configuration for a specific addon."""
+        self.addon_config[addon_name] = config
 
 
 # Global configuration instance
