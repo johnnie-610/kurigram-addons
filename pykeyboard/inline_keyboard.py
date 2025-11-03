@@ -10,7 +10,7 @@
 import contextvars
 import logging
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Union
 
 from pydantic import Field, PrivateAttr, model_validator
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -64,6 +64,16 @@ class InlineKeyboard(KeyboardBase):
     )
 
     pyrogram_markup: Optional[InlineKeyboardMarkup] = PrivateAttr(default=None)
+
+    locale_preferences: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Cached locale selections keyed by an arbitrary identifier (for example, "
+            "a user or chat id)."
+        ),
+    )
+
+    _last_locale_summary: List[Dict[str, Any]] = PrivateAttr(default_factory=list)
 
     custom_locales: Dict[str, str] = Field(
         default_factory=dict, description="User-defined custom locales"
@@ -483,6 +493,13 @@ class InlineKeyboard(KeyboardBase):
         callback_pattern: str,
         locales: Union[str, List[str]],
         row_width: int = 2,
+        *,
+        current_locale: Optional[str] = None,
+        fallback_locale: Optional[str] = None,
+        available_translations: Optional[Union[Iterable[str], Mapping[str, bool]]] = None,
+        mark_unavailable_suffix: str = " (unavailable)",
+        highlight_current_template: str = "✅ {name}",
+        remember_selection_id: Optional[str] = None,
     ) -> None:
         """Create language selection keyboard with comprehensive validation.
 
@@ -490,6 +507,13 @@ class InlineKeyboard(KeyboardBase):
             callback_pattern: Pattern for callback data with {locale} placeholder. Must contain '{locale}'.
             locales: Single locale string or list of locale codes. Cannot be empty.
             row_width: Number of buttons per row. Must be >= 1.
+        Keyword Args:
+            current_locale: Locale to highlight as active.
+            fallback_locale: Locale used when requested locales are invalid.
+            available_translations: Iterable or mapping of locales that have translations available.
+            mark_unavailable_suffix: Text appended to unavailable locales.
+            highlight_current_template: Template applied to the active locale label.
+            remember_selection_id: Identifier used to cache the active locale selection.
 
         Raises:
             LocaleError: If locale parameters are invalid with detailed suggestions.
@@ -507,33 +531,151 @@ class InlineKeyboard(KeyboardBase):
             raise LocaleError("row_width", reason="row_width must be >= 1")
 
         if isinstance(locales, str):
-            locales = [locales]
-        elif not isinstance(locales, list):
+            requested_locales = [locales]
+        elif isinstance(locales, list):
+            requested_locales = list(locales)
+        else:
             raise LocaleError(
                 "locales", reason="locales must be a string or list of strings"
             )
 
-        if not locales:
+        if not requested_locales:
             raise LocaleError("locales", reason="locales list cannot be empty")
 
         all_locales = self.get_all_locales()
-        valid_locales = [locale for locale in locales if locale in all_locales]
+        available_set: Optional[Set[str]] = None
+        if available_translations is not None:
+            if isinstance(available_translations, Mapping):
+                available_set = {
+                    locale
+                    for locale, is_available in available_translations.items()
+                    if is_available
+                }
+            else:
+                available_set = {locale for locale in available_translations}
 
-        if not valid_locales:
-            available_locales = list(all_locales.keys())[:5]
+        active_locale = current_locale
+        stored_preference: Optional[str] = None
+        if remember_selection_id:
+            stored_preference = self.locale_preferences.get(remember_selection_id)
+            if active_locale is None:
+                active_locale = stored_preference
 
-            raise LocaleError(
-                "locales",
-                reason=f"No valid locales found. Available locales include: {available_locales}",
+        if active_locale and active_locale not in all_locales:
+            logger.debug(
+                "Ignoring unknown active locale '%s'", active_locale
             )
+            active_locale = None
 
-        buttons = [
-            self._create_button(
-                text=all_locales[locale],
-                callback_data=callback_pattern.format(locale=locale),
-            )
-            for locale in valid_locales
+        valid_locales: List[str] = [
+            locale for locale in requested_locales if locale in all_locales
         ]
+        invalid_locales: List[str] = [
+            locale for locale in requested_locales if locale not in all_locales
+        ]
+
+        if invalid_locales:
+            logger.info(
+                "Discarding unsupported locales: %s", ", ".join(invalid_locales)
+            )
+
+        fallback_choice: Optional[str] = None
+        if not valid_locales:
+            for candidate in (
+                active_locale,
+                fallback_locale,
+                stored_preference,
+            ):
+                if candidate and candidate in all_locales:
+                    fallback_choice = candidate
+                    break
+
+            if fallback_choice is None:
+                for suggestion in ("en_US", "en_GB"):
+                    if suggestion in all_locales:
+                        fallback_choice = suggestion
+                        break
+
+            if fallback_choice:
+                logger.info(
+                    "No valid locales provided; defaulting to '%s'", fallback_choice
+                )
+                valid_locales = [fallback_choice]
+                active_locale = fallback_choice
+            else:
+                available_sample = list(all_locales.keys())[:5]
+                suggestion = available_sample[0] if available_sample else None
+                raise LocaleError(
+                    "locales",
+                    invalid_value=requested_locales,
+                    reason=(
+                        "No valid locales found. "
+                        + (
+                            f"Suggested locale: {suggestion}. "
+                            if suggestion
+                            else ""
+                        )
+                        + f"Available locales include: {available_sample}"
+                    ),
+                    context={
+                        "invalid_locales": requested_locales,
+                        "suggested_locale": suggestion,
+                    },
+                )
+
+        seen: Set[str] = set()
+        ordered_locales: List[str] = []
+        for locale in valid_locales:
+            if locale not in seen:
+                ordered_locales.append(locale)
+                seen.add(locale)
+
+        if active_locale and active_locale not in seen and active_locale in all_locales:
+            ordered_locales.insert(0, active_locale)
+            seen.add(active_locale)
+
+        locale_summary: List[Dict[str, Any]] = []
+        buttons: List[InlineButton] = []
+        requested_set = set(requested_locales)
+
+        for locale in ordered_locales:
+            base_name = all_locales[locale]
+            is_available = True if available_set is None else locale in available_set
+            label = base_name
+            if not is_available and mark_unavailable_suffix:
+                label = f"{label}{mark_unavailable_suffix}"
+
+            display_text = label
+            if active_locale == locale and highlight_current_template:
+                try:
+                    display_text = highlight_current_template.format(
+                        name=label, locale=locale
+                    )
+                except Exception:
+                    display_text = f"✅ {label}"
+
+            locale_summary.append(
+                {
+                    "locale": locale,
+                    "display_name": base_name,
+                    "label": display_text,
+                    "is_active": active_locale == locale,
+                    "is_available": is_available,
+                    "was_requested": locale in requested_set,
+                }
+            )
+
+            buttons.append(
+                self._create_button(
+                    text=display_text,
+                    callback_data=callback_pattern.format(locale=locale),
+                )
+            )
+
+        if remember_selection_id and active_locale and active_locale in all_locales:
+            self.locale_preferences[remember_selection_id] = active_locale
+
+        self._last_locale_summary = locale_summary
 
         self.keyboard = [
             buttons[i : i + row_width]
@@ -679,9 +821,45 @@ class InlineKeyboard(KeyboardBase):
             >>> 'en_PIRATE' in all_locales
             True
         """
-        all_locales = self._get_locales()
+        all_locales = dict(self._get_locales())
         all_locales.update(self.custom_locales)
         return all_locales
+
+    def remember_locale_selection(self, identifier: str, locale: str) -> None:
+        """Remember a locale selection for a specific identifier."""
+
+        if not identifier:
+            raise ValueError("identifier must be a non-empty string")
+
+        if locale not in self.get_all_locales():
+            raise LocaleError(
+                "locales",
+                invalid_value=locale,
+                reason=f"Locale '{locale}' is not available",
+            )
+
+        self.locale_preferences[identifier] = locale
+
+    def get_locale_selection(self, identifier: str) -> Optional[str]:
+        """Retrieve a remembered locale selection."""
+
+        if not identifier:
+            return None
+
+        return self.locale_preferences.get(identifier)
+
+    def clear_locale_selections(self, identifier: Optional[str] = None) -> None:
+        """Clear stored locale preferences."""
+
+        if identifier is None:
+            self.locale_preferences.clear()
+        else:
+            self.locale_preferences.pop(identifier, None)
+
+    def get_last_locale_summary(self) -> List[Dict[str, Any]]:
+        """Return metadata about the most recent language menu build."""
+
+        return [dict(entry) for entry in self._last_locale_summary]
 
     def to_json(self) -> str:
         """Convert keyboard to JSON string.
