@@ -14,17 +14,19 @@ import asyncio
 import logging
 import time
 import weakref
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
+from pydantic import ValidationError as PydanticValidationError
 from pyrogram import Client
 from pyrogram.types import Update
 
 import pyrogram_patch.patch_helper as ph
-from pyrogram_patch.errors import MiddlewareError, PatchError
+from pyrogram_patch.errors import MiddlewareError, PatchError, ValidationError
 from pyrogram_patch.fsm.base_storage import BaseStorage
 from pyrogram_patch.fsm.context_manager import FSMContextManager
 from pyrogram_patch.middlewares.middleware_manager import MiddlewareManager
+from pyrogram_patch.config import get_config
 
 logger = logging.getLogger("pyrogram_patch.patch_data_pool")
 
@@ -78,12 +80,18 @@ class PatchDataPool:
 
     async def _initialize(self) -> None:
         """Async initialization of pool structures."""
+        config = get_config()
         self._helpers: Dict[str, PooledHelperData] = {}
-        self._helper_refs: Dict[str, weakref.ReferenceType[PatchHelper]] = {}
+        self._helper_refs: Dict[str, weakref.ReferenceType[ph.PatchHelper]] = {}
         self._middleware_manager = MiddlewareManager()
         self._fsm_storage: Optional[BaseStorage] = None
         self._fsm_manager: Optional[FSMContextManager] = None
         self._lock = asyncio.Lock()
+        self._session_ttl = max(0.0, float(config.fsm.helper_session_ttl))
+        self._persist_helpers = bool(config.fsm.persist_helpers)
+        self._started_at = time.time()
+        self._total_helpers_created = 0
+        self._expired_helper_count = 0
         self._initialized = True
 
     def __init__(self) -> None:
@@ -109,22 +117,113 @@ class PatchDataPool:
             PatchError: If helper already pooled for key.
         """
         if client is None:
-            # For basic implementation compatibility, create a dummy key
             key = f"basic_{id(update)}"
         else:
             key = await ph.create_key(update, client)
+
         pooled_data = PooledHelperData(
             key=key, helper_id=id(helper), timestamp=time.time()
         )
+
+        expired_helpers: List[Tuple[str, Optional[ph.PatchHelper]]]
+        is_new_entry = False
         async with self._lock:
-            if key in self._helpers:
-                # Update existing entry instead of raising error
-                self._helpers[key] = pooled_data
-                self._helper_refs[key] = weakref.ref(helper)
-            else:
-                # Add new entry
-                self._helpers[key] = pooled_data
-                self._helper_refs[key] = weakref.ref(helper)
+            expired_helpers = self._cleanup_expired_helpers_locked()
+            existing_ref = self._helper_refs.get(key)
+            is_new_entry = existing_ref is None or existing_ref() is None
+            self._helpers[key] = pooled_data
+            self._helper_refs[key] = weakref.ref(helper)
+            if is_new_entry:
+                self._total_helpers_created += 1
+
+        await self._persist_expired_helpers(expired_helpers)
+
+        if self._persist_helpers and is_new_entry:
+            await self._restore_helper_snapshot(key, helper)
+
+    def _session_storage_key(self, key: str) -> str:
+        return f"helper:{key}"
+
+    def _cleanup_expired_helpers_locked(
+        self,
+    ) -> List[Tuple[str, Optional[ph.PatchHelper]]]:
+        if not self._session_ttl:
+            return []
+
+        now = time.time()
+        expired: List[Tuple[str, Optional[ph.PatchHelper]]] = []
+        keys_to_remove = [
+            key
+            for key, data in list(self._helpers.items())
+            if now - data.timestamp >= self._session_ttl
+        ]
+
+        for key in keys_to_remove:
+            ref = self._helper_refs.pop(key, None)
+            helper = ref() if ref else None
+            self._helpers.pop(key, None)
+            expired.append((key, helper))
+            self._expired_helper_count += 1
+
+        return expired
+
+    async def _persist_helper_snapshot(
+        self, key: str, helper: Optional[ph.PatchHelper]
+    ) -> None:
+        if not self._persist_helpers or self._fsm_storage is None or helper is None:
+            return
+
+        try:
+            snapshot = await helper.export_snapshot()
+            payload = {
+                "name": snapshot.state,
+                "data": snapshot.data,
+            }
+            ttl = int(self._session_ttl) if self._session_ttl > 0 else None
+            await self._fsm_storage.set_state(
+                self._session_storage_key(key), payload, ttl=ttl
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "Failed to persist helper snapshot for %s: %s", key, exc
+            )
+
+    async def _restore_helper_snapshot(
+        self, key: str, helper: ph.PatchHelper
+    ) -> None:
+        if not self._persist_helpers or self._fsm_storage is None:
+            return
+
+        try:
+            payload = await self._fsm_storage.get_state(
+                self._session_storage_key(key)
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to load helper snapshot for %s: %s", key, exc)
+            return
+
+        if not payload:
+            return
+
+        try:
+            snapshot = ph.PatchHelperData(
+                state=str(payload.get("name", "*")),
+                data=payload.get("data") or {},
+            )
+        except PydanticValidationError as exc:
+            logger.debug("Invalid helper snapshot for %s: %s", key, exc)
+            return
+
+        await helper.apply_snapshot(snapshot)
+
+    async def _persist_expired_helpers(
+        self, expired: List[Tuple[str, Optional[ph.PatchHelper]]]
+    ) -> None:
+        if not expired or not self._persist_helpers:
+            return
+
+        for key, helper in expired:
+            await self._persist_helper_snapshot(key, helper)
 
     async def exclude_helper_from_pool(
         self, update: Update, client: Optional[Client] = None
@@ -143,16 +242,24 @@ class PatchDataPool:
             LockError: If pool lock cannot be acquired.
         """
         if client is None:
-            # For basic implementation compatibility, create a dummy key
             key = f"basic_{id(update)}"
         else:
             key = await ph.create_key(update, client)
+
+        helper: Optional[ph.PatchHelper] = None
+        expired_helpers: List[Tuple[str, Optional[ph.PatchHelper]]]
         async with self._lock:
-            if key in self._helpers:
-                del self._helpers[key]
-                self._helper_refs.pop(key, None)
-                return True
-            return False
+            expired_helpers = self._cleanup_expired_helpers_locked()
+            ref = self._helper_refs.pop(key, None)
+            helper = ref() if ref else None
+            removed = key in self._helpers
+            if removed:
+                self._helpers.pop(key, None)
+
+        await self._persist_expired_helpers(expired_helpers)
+        if removed:
+            await self._persist_helper_snapshot(key, helper)
+        return removed
 
     async def get_helper_from_pool(
         self, update: Update, client: Client
@@ -168,18 +275,29 @@ class PatchDataPool:
             PatchHelper: The pooled or new helper instance.
         """
         key = await ph.create_key(update, client)
+        helper: Optional[ph.PatchHelper]
+        created = False
+        expired_helpers: List[Tuple[str, Optional[ph.PatchHelper]]]
         async with self._lock:
+            expired_helpers = self._cleanup_expired_helpers_locked()
             ref = self._helper_refs.get(key)
-            if ref and (helper := ref()) is not None:
-                return helper
-            # Create new helper
-            new_helper = ph.PatchHelper()
-            self._helper_refs[key] = weakref.ref(new_helper)
+            helper = ref() if ref else None
+            if helper is None:
+                helper = ph.PatchHelper()
+                self._helper_refs[key] = weakref.ref(helper)
+                created = True
+                self._total_helpers_created += 1
             pooled_data = PooledHelperData(
-                key=key, helper_id=id(new_helper), timestamp=time.time()
+                key=key, helper_id=id(helper), timestamp=time.time()
             )
             self._helpers[key] = pooled_data
-            return new_helper
+
+        await self._persist_expired_helpers(expired_helpers)
+
+        if created and self._persist_helpers:
+            await self._restore_helper_snapshot(key, helper)
+
+        return helper
 
     def set_fsm_storage(self, storage: BaseStorage) -> None:
         """
@@ -206,6 +324,28 @@ class PatchDataPool:
     async def get_fsm_storage(self) -> Optional[BaseStorage]:
         """Get the current FSM storage."""
         return self._fsm_storage
+
+    async def get_statistics(self) -> Dict[str, Any]:
+        """Return operational statistics for the helper pool."""
+
+        async with self._lock:
+            now = time.time()
+            active = len(self._helpers)
+            oldest_age = 0.0
+            if self._helpers:
+                oldest_age = max(
+                    now - data.timestamp for data in self._helpers.values()
+                )
+
+            return {
+                "active_helpers": active,
+                "session_ttl": self._session_ttl,
+                "persist_helpers": self._persist_helpers,
+                "uptime": now - self._started_at,
+                "expired_helpers": self._expired_helper_count,
+                "total_helpers_created": self._total_helpers_created,
+                "oldest_helper_age": oldest_age,
+            }
 
     # Middleware integration
     async def add_middleware(

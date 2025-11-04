@@ -9,11 +9,12 @@
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .inline_keyboard import InlineKeyboard
 from .keyboard_base import KeyboardBase
 from .reply_keyboard import ReplyKeyboard
+from .performance import KeyboardProfiler
 
 logger = logging.getLogger("pykeyboard.visualization")
 
@@ -165,11 +166,22 @@ class KeyboardVisualizer:
         return analysis
 
     @staticmethod
-    def generate_debug_report(keyboard: InlineKeyboard | ReplyKeyboard) -> str:
+    def generate_debug_report(
+        keyboard: InlineKeyboard | ReplyKeyboard,
+        *,
+        include_metrics: bool = False,
+        profiler: Optional[KeyboardProfiler] = None,
+        profile_operations: Optional[Iterable[str]] = None,
+    ) -> str:
         """Generate a comprehensive debug report for the keyboard.
 
         Args:
             keyboard: The keyboard to debug
+        Keyword Args:
+            include_metrics: When True, append a performance snapshot to the report.
+            profiler: Optional profiler instance to reuse when capturing metrics.
+            profile_operations: Iterable of operation names to measure. Defaults to
+                a standard set when omitted.
 
         Returns:
             str: Detailed debug report
@@ -221,9 +233,109 @@ class KeyboardVisualizer:
                 ]
             )
 
+        if include_metrics:
+            _, metrics = KeyboardVisualizer.collect_performance_metrics(
+                keyboard,
+                profiler=profiler,
+                operations=profile_operations,
+            )
+
+            if metrics:
+                report_lines.extend(["", "PERFORMANCE SNAPSHOT:", "-" * 50])
+                for operation, stats in metrics:
+                    report_lines.append(f"  Operation: {operation}")
+                    for key in (
+                        "count",
+                        "total_time",
+                        "mean",
+                        "median",
+                        "min",
+                        "max",
+                        "stdev",
+                    ):
+                        if key in stats:
+                            value = stats[key]
+                            if isinstance(value, float):
+                                report_lines.append(
+                                    f"    {key.title().replace('_', ' ')}: {value:.6f}s"
+                                )
+                            else:
+                                report_lines.append(
+                                    f"    {key.title().replace('_', ' ')}: {value}"
+                                )
+                    if "memory_mean" in stats:
+                        report_lines.append(
+                            f"    Memory Mean: {stats['memory_mean']:.0f} bytes"
+                        )
+                    if "memory_median" in stats:
+                        report_lines.append(
+                            f"    Memory Median: {stats['memory_median']:.0f} bytes"
+                        )
+
         report_lines.extend(["", "VISUALIZATION:", visualization, "", "=" * 50])
 
         return "\n".join(report_lines)
+
+    @staticmethod
+    def collect_performance_metrics(
+        keyboard: InlineKeyboard | ReplyKeyboard,
+        *,
+        profiler: Optional[KeyboardProfiler] = None,
+        operations: Optional[Iterable[str]] = None,
+    ) -> Tuple[KeyboardProfiler, List[Tuple[str, Dict[str, Any]]]]:
+        """Run profiling operations and return collected metrics."""
+
+        profiler = profiler or KeyboardProfiler()
+        data_cache: Dict[str, Any] = {}
+
+        def ensure_dict() -> Dict[str, Any]:
+            if "dict" not in data_cache:
+                data_cache["dict"] = keyboard.to_dict()
+            return data_cache["dict"]
+
+        def ensure_json() -> str:
+            if "json" not in data_cache:
+                data_cache["json"] = keyboard.to_json()
+            return data_cache["json"]
+
+        operations_map: Dict[str, Any] = {
+            "to_dict": ensure_dict,
+            "to_json": ensure_json,
+            "from_dict": lambda: type(keyboard).from_dict(ensure_dict()),
+            "from_json": lambda: type(keyboard).from_json(ensure_json()),
+        }
+
+        if hasattr(keyboard, "pyrogram_markup"):
+            operations_map["pyrogram_markup"] = lambda: keyboard.pyrogram_markup
+
+        selected_operations = (
+            list(operations)
+            if operations is not None
+            else list(operations_map.keys())
+        )
+
+        executed: List[str] = []
+        for operation in selected_operations:
+            callback = operations_map.get(operation)
+            if callback is None:
+                continue
+
+            try:
+                with profiler.start_operation(operation):
+                    callback()
+                executed.append(operation)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Failed to profile operation '%s': %s", operation, exc
+                )
+
+        metrics: List[Tuple[str, Dict[str, Any]]] = []
+        for operation in executed:
+            stats = profiler.get_operation_stats(operation)
+            if stats:
+                metrics.append((operation, stats))
+
+        return profiler, metrics
 
     @staticmethod
     def compare_keyboards(
@@ -332,14 +444,41 @@ class KeyboardVisualizer:
             )
 
 
-def visualize(keyboard: InlineKeyboard | ReplyKeyboard) -> str:
+def visualize(
+    keyboard: InlineKeyboard | ReplyKeyboard,
+    *,
+    include_metrics: bool = False,
+    profiler: Optional[KeyboardProfiler] = None,
+    profile_operations: Optional[Iterable[str]] = None,
+) -> str:
     """Quick visualization of a keyboard."""
+
+    if include_metrics:
+        return KeyboardVisualizer.generate_debug_report(
+            keyboard,
+            include_metrics=True,
+            profiler=profiler,
+            profile_operations=profile_operations,
+        )
+
     return KeyboardVisualizer.visualize_keyboard(keyboard)
 
 
-def debug(keyboard: InlineKeyboard | ReplyKeyboard) -> str:
+def debug(
+    keyboard: InlineKeyboard | ReplyKeyboard,
+    *,
+    include_metrics: bool = False,
+    profiler: Optional[KeyboardProfiler] = None,
+    profile_operations: Optional[Iterable[str]] = None,
+) -> str:
     """Quick debug report for a keyboard."""
-    return KeyboardVisualizer.generate_debug_report(keyboard)
+
+    return KeyboardVisualizer.generate_debug_report(
+        keyboard,
+        include_metrics=include_metrics,
+        profiler=profiler,
+        profile_operations=profile_operations,
+    )
 
 
 def analyze(keyboard: InlineKeyboard | ReplyKeyboard) -> Dict[str, Any]:

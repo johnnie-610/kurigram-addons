@@ -9,7 +9,7 @@ This bot demonstrates all key features of the enhanced pyrogram_patch:
 - Thread-safe data management with weak references
 - Comprehensive metrics and monitoring system
 - Configuration management with validation
-- Plugin architecture for extensibility
+- Addon architecture for extensibility
 - Enhanced security with input validation and JSON schema validation
 - Event-driven cleanup for optimal performance
 
@@ -37,7 +37,7 @@ New Features Demo:
 - /start: Enhanced main menu with all new features
 - /metrics: View real-time performance metrics
 - /config: Show current configuration
-- /plugins: Demonstrate plugin system
+- /addons: Demonstrate addon system
 - FSM Demo: Multi-step profile collection with enhanced error handling
 - Middleware Demo: Advanced logging with context isolation
 - Circuit Breaker Demo: Storage resilience testing
@@ -78,8 +78,8 @@ from pyrogram_patch.middlewares.context import (MiddlewareContext,
 from pyrogram_patch.middlewares.middleware_types.middlewares import \
     BaseMiddleware
 from pyrogram_patch.patch_helper import PatchHelper
-from pyrogram_patch.plugins import (PluginBase, discover_plugins_in_module,
-                                    get_plugin_manager)
+from pyrogram_patch.addons import (discover_addons_in_module,
+                                   get_addon_manager)
 from pyrogram_patch.router import Router
 
 # Thread-safe note: pyrogram_patch uses thread-safe data management via patch_data_pool,
@@ -429,7 +429,7 @@ async def start_handler(client: Client, message: Message):
         InlineButton("🔧 Middleware Demo", "demo:middleware"),
         InlineButton("📊 Metrics", "demo:metrics"),
         InlineButton("⚙️ Config", "demo:config"),
-        InlineButton("🔌 Plugins", "demo:plugins"),
+        InlineButton("🔌 Addons", "demo:addons"),
         InlineButton("🛡️ Circuit Breaker", "demo:circuit_breaker"),
         InlineButton("📁 Router Demo", "demo:router"),
         InlineButton("💾 Storage Info", "info:storage"),
@@ -448,7 +448,7 @@ Current Configuration:
 New Features Available:
 • Real-time metrics monitoring
 • Configuration management
-• Plugin architecture
+• Addon architecture
 • Circuit breaker protection
 • Enhanced security & performance
 
@@ -485,9 +485,9 @@ async def menu_callback(client: Client, query: CallbackQuery):
             await query.message.edit_text(
                 "⚙️ Configuration Demo\n\nSend /config to view current configuration settings."
             )
-        elif data == "demo:plugins":
+        elif data == "demo:addons":
             await query.message.edit_text(
-                "🔌 Plugin Demo\n\nSend /plugins to view loaded plugins and their capabilities."
+                "🔌 Addon Demo\n\nSend /addons to view loaded addons and their capabilities."
             )
         elif data == "demo:circuit_breaker":
             await query.message.edit_text(
@@ -951,28 +951,26 @@ Storage:
     await message.reply_text(config_info)
 
 
-# New plugins command
-@commands_router.on_message(filters.command("plugins") & filters.private)
-async def plugins_handler(client: Client, message: Message):
-    """Shows loaded plugins and their capabilities."""
-    plugin_manager = get_plugin_manager()
-    plugins = plugin_manager.list_plugins()
+# New addons command
+@commands_router.on_message(filters.command("addons") & filters.private)
+async def addons_handler(client: Client, message: Message):
+    """Shows loaded addons and their capabilities."""
+    addon_manager = get_addon_manager()
+    addons = addon_manager.list_addons()
 
-    if not plugins:
-        await message.reply_text("🔌 No plugins currently loaded.")
+    if not addons:
+        await message.reply_text("🔌 No addons currently loaded.")
         return
 
-    plugins_info = "🔌 Loaded Plugins:\n\n"
-    for plugin in plugins:
-        plugins_info += f"📦 {plugin['name']} v{plugin['version']}\n"
-        plugins_info += f"   {plugin['description']}\n"
-        if plugin["capabilities"]:
-            plugins_info += (
-                f"   Capabilities: {', '.join(plugin['capabilities'])}\n"
-            )
-        plugins_info += "\n"
+    addons_info = "🔌 Loaded Addons:\n\n"
+    for addon in addons:
+        addons_info += f"📦 {addon['name']} v{addon['version']}\n"
+        addons_info += f"   {addon['description']}\n"
+        if addon["capabilities"]:
+            addons_info += f"   Capabilities: {', '.join(addon['capabilities'])}\n"
+        addons_info += "\n"
 
-    await message.reply_text(plugins_info)
+    await message.reply_text(addons_info)
 
 
 # New circuit breaker command
@@ -1046,40 +1044,40 @@ async def main():
     patch_manager.include_router(fsm_router)
     logger.info("Routers registered successfully")
 
-    # Load plugins if configured
-    if config.plugins:
-        plugin_manager = get_plugin_manager()
-        loaded_plugins = []
-        for plugin_spec in config.plugins:
+    # Load addons if configured
+    if config.addons:
+        addon_manager = get_addon_manager()
+        loaded_addons = []
+        for addon_spec in config.addons:
             try:
-                if ":" in plugin_spec:
-                    module_name, class_name = plugin_spec.split(":", 1)
-                    plugin_name = await plugin_manager.load_plugin_from_module(
+                if ":" in addon_spec:
+                    module_name, class_name = addon_spec.split(":", 1)
+                    addon_name = await addon_manager.load_addon_from_module(
                         module_name,
                         class_name,
-                        config.get_plugin_config(plugin_spec),
+                        config.get_addon_config(addon_spec),
                     )
                 else:
-                    # Assume it's a module with a default plugin class
-                    plugins_found = discover_plugins_in_module(plugin_spec)
-                    if plugins_found:
-                        plugin_name = await plugin_manager.load_plugin(
-                            plugins_found[0],
-                            config.get_plugin_config(plugin_spec),
+                    # Assume it's a module with a default addon class
+                    addons_found = discover_addons_in_module(addon_spec)
+                    if addons_found:
+                        addon_name = await addon_manager.load_addon(
+                            addons_found[0],
+                            config.get_addon_config(addon_spec),
                         )
                     else:
                         logger.warning(
-                            f"No plugins found in module {plugin_spec}"
+                            f"No addons found in module {addon_spec}"
                         )
                         continue
-                loaded_plugins.append(plugin_name)
-                logger.info(f"Plugin loaded: {plugin_name}")
+                loaded_addons.append(addon_name)
+                logger.info(f"Addon loaded: {addon_name}")
             except Exception as e:
-                logger.error(f"Failed to load plugin {plugin_spec}: {e}")
+                logger.error(f"Failed to load addon {addon_spec}: {e}")
 
-        if loaded_plugins:
+        if loaded_addons:
             logger.info(
-                f"Successfully loaded {len(loaded_plugins)} plugins: {', '.join(loaded_plugins)}"
+                f"Successfully loaded {len(loaded_addons)} addons: {', '.join(loaded_addons)}"
             )
 
     # Log router capabilities
@@ -1115,11 +1113,11 @@ async def main():
     finally:
         # Cleanup on shutdown
         try:
-            plugin_manager = get_plugin_manager()
-            await plugin_manager.shutdown_all()
-            logger.info("Plugins shut down successfully")
+            addon_manager = get_addon_manager()
+            await addon_manager.shutdown_all()
+            logger.info("Addons shut down successfully")
         except Exception as e:
-            logger.error(f"Error during plugin shutdown: {e}")
+            logger.error(f"Error during addon shutdown: {e}")
 
         await app.stop()
         logger.info("Bot stopped successfully")

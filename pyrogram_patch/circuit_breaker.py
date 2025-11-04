@@ -19,7 +19,7 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, Dict, Generic, Optional, TypeVar
 
 logger = logging.getLogger("pyrogram_patch.circuit_breaker")
 
@@ -232,3 +232,9 @@ async def reset_circuit_breaker(name: str) -> bool:
         logger.info("Circuit breaker '%s' reset to closed state", name)
         return True
     return False
+
+
+def list_circuit_breakers() -> Dict[str, AsyncCircuitBreaker]:
+    """Return a mapping of registered circuit breakers."""
+
+    return dict(_storage_circuit_breakers)

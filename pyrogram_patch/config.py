@@ -34,6 +34,12 @@ class CircuitBreakerConfig(BaseSettings):
     timeout: float = Field(
         default=10.0, description="Operation timeout in seconds"
     )
+    fallback_message: str = Field(
+        default=(
+            "⚠️ We're experiencing temporary issues. Please try again in a moment."
+        ),
+        description="Message sent to end users when a circuit breaker is open",
+    )
 
     class Config:
         env_prefix = "PYROGRAM_PATCH_CB_"
@@ -65,6 +71,14 @@ class FSMConfig(BaseSettings):
     )
     cleanup_interval: float = Field(
         default=300.0, description="State cleanup interval in seconds"
+    )
+    helper_session_ttl: float = Field(
+        default=900.0,
+        description="Seconds to keep helper sessions in memory before cleanup",
+    )
+    persist_helpers: bool = Field(
+        default=False,
+        description="Persist helper snapshots to storage for session recovery",
     )
 
     class Config:
@@ -151,27 +165,27 @@ class PyrogramPatchConfig(BaseSettings):
         default=False, description="Enable telemetry collection"
     )
 
-    # Plugin settings
-    plugins: List[str] = Field(
-        default_factory=list, description="List of enabled plugins"
+    # Addon settings
+    addons: List[str] = Field(
+        default_factory=list, description="List of enabled addons"
     )
-    plugin_config: Dict[str, Any] = Field(
-        default_factory=dict, description="Plugin-specific configuration"
+    addon_config: Dict[str, Any] = Field(
+        default_factory=dict, description="Addon-specific configuration"
     )
 
     class Config:
         env_prefix = "PYROGRAM_PATCH_"
         case_sensitive = False
 
-    def get_plugin_config(self, plugin_name: str) -> Dict[str, Any]:
-        """Get configuration for a specific plugin."""
-        return self.plugin_config.get(plugin_name, {})
+    def get_addon_config(self, addon_name: str) -> Dict[str, Any]:
+        """Get configuration for a specific addon."""
+        return self.addon_config.get(addon_name, {})
 
-    def set_plugin_config(
-        self, plugin_name: str, config: Dict[str, Any]
+    def set_addon_config(
+        self, addon_name: str, config: Dict[str, Any]
     ) -> None:
-        """Set configuration for a specific plugin."""
-        self.plugin_config[plugin_name] = config
+        """Set configuration for a specific addon."""
+        self.addon_config[addon_name] = config
 
 
 # Global configuration instance

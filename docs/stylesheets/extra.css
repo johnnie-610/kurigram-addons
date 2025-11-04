@@ -1,0 +1,40 @@
+.hero {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  background: linear-gradient(135deg, var(--md-primary-fg-color), #6c63ff);
+  color: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 1.5rem 3rem rgba(44, 51, 73, 0.35);
+}
+
+.hero .md-button {
+  margin: 0.5rem;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+@media (min-width: 768px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.feature-grid div {
+  background: var(--md-card-bg-color);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  box-shadow: 0 1rem 2rem rgba(44, 51, 73, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-grid div:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 1.75rem 3rem rgba(44, 51, 73, 0.2);
+}

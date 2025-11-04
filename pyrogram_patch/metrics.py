@@ -145,6 +145,19 @@ class MetricsCollector:
         """Get recent metric samples."""
         return list(self.samples)[-limit:]
 
+    def get_counter_totals(self) -> Dict[str, int]:
+        """Return aggregated counter totals across all labels."""
+
+        return {
+            name: sum(label_values.values())
+            for name, label_values in self.counters.items()
+        }
+
+    def get_histogram_counts(self) -> Dict[str, int]:
+        """Return observation counts for each histogram."""
+
+        return {name: len(values) for name, values in self.histograms.items()}
+
     def get_prometheus_format(self) -> str:
         """Export metrics in Prometheus format."""
         lines = []
