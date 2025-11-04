@@ -9,7 +9,8 @@
 
 import logging
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Mapping,
+                    Optional, Sequence, TypeVar, Union)
 
 from .errors import (ConfigurationError, LocaleError, PaginationError,
                      ValidationError)
@@ -20,6 +21,11 @@ from .reply_keyboard import ReplyButton, ReplyKeyboard
 T = TypeVar("T", bound=KeyboardBase)
 
 logger = logging.getLogger("pykeyboard.builder")
+
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .presets import (KeyboardPreset, KeyboardPresetRegistry, KeyboardTheme,
+                          KeyboardThemeRegistry)
 
 
 class KeyboardBuilder:
@@ -71,6 +77,73 @@ class KeyboardBuilder:
             >>> builder.add_validation_hook(validate_text)
         """
         self._validation_hooks.append(hook)
+        return self
+
+    def apply_theme(
+        self,
+        theme: Union["KeyboardTheme", str],
+        *,
+        context: Optional[Mapping[str, Any]] = None,
+        theme_registry: Optional["KeyboardThemeRegistry"] = None,
+    ) -> "KeyboardBuilder":
+        """Apply a keyboard theme to the builder.
+
+        Args:
+            theme: Theme instance or registered theme name.
+            context: Optional context passed to the theme.
+            theme_registry: Optional custom registry for resolving theme names.
+
+        Returns:
+            Self for method chaining.
+        """
+
+        if isinstance(theme, str):
+            from .presets import theme_registry as default_theme_registry
+
+            registry = theme_registry or default_theme_registry
+            resolved_theme = registry.get(theme)
+        else:
+            resolved_theme = theme
+
+        resolved_theme.apply(self, context=context)
+        return self
+
+    def apply_preset(
+        self,
+        preset: Union["KeyboardPreset", str],
+        *,
+        context: Optional[Mapping[str, Any]] = None,
+        themes: Optional[Sequence[Union["KeyboardTheme", str]]] = None,
+        preset_registry: Optional["KeyboardPresetRegistry"] = None,
+        theme_registry: Optional["KeyboardThemeRegistry"] = None,
+    ) -> "KeyboardBuilder":
+        """Apply a registered keyboard preset to the builder.
+
+        Args:
+            preset: Preset instance or registered preset name.
+            context: Optional context provided to the preset.
+            themes: Optional collection of theme instances or names.
+            preset_registry: Custom registry used when resolving presets by name.
+            theme_registry: Registry used to resolve theme names.
+
+        Returns:
+            Self for method chaining.
+        """
+
+        if isinstance(preset, str):
+            from .presets import preset_registry as default_preset_registry
+
+            registry = preset_registry or default_preset_registry
+            resolved_preset = registry.get(preset)
+        else:
+            resolved_preset = preset
+
+        resolved_preset.apply_to(
+            self,
+            context=context,
+            themes=themes,
+            theme_registry_override=theme_registry,
+        )
         return self
 
     def add_button_transform(
@@ -356,6 +429,8 @@ class KeyboardFactory:
         cancel_text: Optional[str] = None,
         callback_pattern: str = "confirm_{action}",
         columns: int = 2,
+        themes: Optional[Sequence[Union["KeyboardTheme", str]]] = None,
+        extra_context: Optional[Mapping[str, Any]] = None,
     ) -> InlineKeyboard:
         """Create a confirmation dialog keyboard.
 
@@ -365,6 +440,8 @@ class KeyboardFactory:
             cancel_text: Text for cancel button (optional)
             callback_pattern: Pattern for callback data
             columns: int: Row width of the keyboard
+            themes: Optional theme sequence to apply during build
+            extra_context: Additional context passed to presets/themes
 
         Returns:
             Configured InlineKeyboard
@@ -372,37 +449,29 @@ class KeyboardFactory:
         Example:
             >>> keyboard = KeyboardFactory.create_confirmation_keyboard()
         """
-        keyboard = InlineKeyboard(row_width=columns)
-        builder = KeyboardBuilder(keyboard)
+        from .presets import preset_registry
 
-        buttons = [
-            {
-                "text": yes_text,
-                "callback_data": callback_pattern.format(action="yes"),
-            },
-            {
-                "text": no_text,
-                "callback_data": callback_pattern.format(action="no"),
-            },
-        ]
-        if cancel_text:
-            # Ensure cancel button has proper callback_data; pass as dict spec to avoid creating a text-only button
-            buttons.append(
-                {
-                    "text": cancel_text,
-                    "callback_data": callback_pattern.format(action="cancel"),
-                }
-            )
+        context: Dict[str, Any] = {
+            "yes_text": yes_text,
+            "no_text": no_text,
+            "callback_pattern": callback_pattern,
+            "columns": columns,
+        }
+        if cancel_text is not None:
+            context["cancel_text"] = cancel_text
+        if extra_context:
+            context.update(extra_context)
 
-        builder.add_buttons(*buttons)
-
-        return builder.build()
+        preset = preset_registry.get("confirmation")
+        return preset.build(context=context, themes=themes)
 
     @staticmethod
     def create_menu_keyboard(
         menu_items: Dict[str, str],
         callback_pattern: str = "menu_{action}",
         columns: int = 2,
+        themes: Optional[Sequence[Union["KeyboardTheme", str]]] = None,
+        extra_context: Optional[Mapping[str, Any]] = None,
     ) -> InlineKeyboard:
         """Create a menu keyboard from a dictionary of items.
 
@@ -410,6 +479,8 @@ class KeyboardFactory:
             menu_items: Dict mapping button text to action
             callback_pattern: Pattern for callback data
             columns: Number of columns
+            themes: Optional theme sequence to apply during build
+            extra_context: Additional context passed to presets/themes
 
         Returns:
             Configured InlineKeyboard
@@ -418,26 +489,27 @@ class KeyboardFactory:
             >>> menu = {"Home": "home", "Settings": "settings", "Help": "help"}
             >>> keyboard = KeyboardFactory.create_menu_keyboard(menu)
         """
-        keyboard = InlineKeyboard(row_width=columns)
-        builder = KeyboardBuilder(keyboard)
+        from .presets import preset_registry
 
-        buttons = []
-        for text, action in menu_items.items():
-            buttons.append(
-                {
-                    "text": text,
-                    "callback_data": callback_pattern.format(action=action),
-                }
-            )
+        context: Dict[str, Any] = {
+            "menu_items": menu_items,
+            "callback_pattern": callback_pattern,
+            "columns": columns,
+        }
 
-        builder.add_buttons(*buttons)
-        return builder.build()
+        if extra_context:
+            context.update(extra_context)
+
+        preset = preset_registry.get("menu")
+        return preset.build(context=context, themes=themes)
 
     @staticmethod
     def create_rating_keyboard(
         max_rating: int = 5,
         callback_pattern: str = "rate_{stars}",
         include_labels: bool = True,
+        themes: Optional[Sequence[Union["KeyboardTheme", str]]] = None,
+        extra_context: Optional[Mapping[str, Any]] = None,
     ) -> InlineKeyboard:
         """Create a star rating keyboard.
 
@@ -445,6 +517,8 @@ class KeyboardFactory:
             max_rating: Maximum rating value
             callback_pattern: Pattern for callback data
             include_labels: Whether to include rating labels
+            themes: Optional theme sequence to apply during build
+            extra_context: Additional context passed to presets/themes
 
         Returns:
             Configured InlineKeyboard
@@ -452,25 +526,19 @@ class KeyboardFactory:
         Example:
             >>> keyboard = KeyboardFactory.create_rating_keyboard(5)
         """
-        keyboard = InlineKeyboard()
-        builder = KeyboardBuilder(keyboard)
-        texts = []
-        buttons = []
+        from .presets import preset_registry
 
-        for i in range(1, max_rating + 1):
-            stars = "⭐" * i
-            text = f"{stars} ({i})" if include_labels else stars
-            texts.append(text)
-            buttons.append(
-                {
-                    "text": text,
-                    "callback_data": callback_pattern.format(stars=i),
-                }
-            )
+        context: Dict[str, Any] = {
+            "max_rating": max_rating,
+            "callback_pattern": callback_pattern,
+            "include_labels": include_labels,
+        }
 
-        builder.add_buttons(*buttons)
+        if extra_context:
+            context.update(extra_context)
 
-        return builder.build()
+        preset = preset_registry.get("rating")
+        return preset.build(context=context, themes=themes)
 
     @staticmethod
     def create_pagination_keyboard(
@@ -478,6 +546,8 @@ class KeyboardFactory:
         current_page: int,
         callback_pattern: str = "page_{number}",
         include_buttons: Optional[List[Dict[str, str]]] = None,
+        themes: Optional[Sequence[Union["KeyboardTheme", str]]] = None,
+        extra_context: Optional[Mapping[str, Any]] = None,
     ) -> InlineKeyboard:
         """Create a pagination keyboard with optional additional buttons.
 
@@ -486,6 +556,8 @@ class KeyboardFactory:
             current_page: Current page number
             callback_pattern: Pattern for pagination callbacks
             include_buttons: Additional buttons to include
+            themes: Optional theme sequence to apply during build
+            extra_context: Additional context passed to presets/themes
 
         Returns:
             Configured InlineKeyboard
@@ -493,33 +565,28 @@ class KeyboardFactory:
         Example:
             >>> keyboard = KeyboardFactory.create_pagination_keyboard(10, 5)
         """
-        keyboard = InlineKeyboard()
-        builder = KeyboardBuilder(keyboard)
+        from .presets import preset_registry
 
-        builder.add_navigation_buttons(
-            total_pages, current_page, callback_pattern
-        )
+        context: Dict[str, Any] = {
+            "total_pages": total_pages,
+            "current_page": current_page,
+            "callback_pattern": callback_pattern,
+        }
+        if include_buttons is not None:
+            context["include_buttons"] = include_buttons
+        if extra_context:
+            context.update(extra_context)
 
-        if include_buttons:
-            button_specs = []
-            for btn in include_buttons:
-                button_specs.append(
-                    {
-                        "text": btn["text"],
-                        "callback_data": btn.get(
-                            "callback_data", btn["text"].lower()
-                        ),
-                    }
-                )
-            builder.add_row(*button_specs)
-
-        return builder.build()
+        preset = preset_registry.get("pagination")
+        return preset.build(context=context, themes=themes)
 
     @staticmethod
     def create_language_keyboard(
         locales: List[str],
         callback_pattern: str = "lang_{locale}",
         row_width: int = 2,
+        themes: Optional[Sequence[Union["KeyboardTheme", str]]] = None,
+        extra_context: Optional[Mapping[str, Any]] = None,
     ) -> InlineKeyboard:
         """Create a language selection keyboard.
 
@@ -527,6 +594,8 @@ class KeyboardFactory:
             locales: List of locale codes
             callback_pattern: Pattern for callback data
             row_width: Number of buttons per row
+            themes: Optional theme sequence to apply during build
+            extra_context: Additional context passed to presets/themes
 
         Returns:
             Configured InlineKeyboard
@@ -536,10 +605,19 @@ class KeyboardFactory:
             ...     ["en_US", "es_ES", "fr_FR"]
             ... )
         """
-        keyboard = InlineKeyboard()
-        builder = KeyboardBuilder(keyboard)
-        builder.add_language_buttons(locales, callback_pattern, row_width)
-        return builder.build()
+        from .presets import preset_registry
+
+        context: Dict[str, Any] = {
+            "locales": locales,
+            "callback_pattern": callback_pattern,
+            "row_width": row_width,
+        }
+
+        if extra_context:
+            context.update(extra_context)
+
+        preset = preset_registry.get("languages")
+        return preset.build(context=context, themes=themes)
 
     @staticmethod
     def clone_keyboard(

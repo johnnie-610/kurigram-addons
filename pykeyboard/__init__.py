@@ -57,6 +57,24 @@ except ImportError:
     build_reply_keyboard = None
     keyboard_factory = None
 
+try:
+    from .presets import (KeyboardPreset, KeyboardPresetRegistry,
+                          KeyboardTheme, KeyboardThemeRegistry,
+                          preset_registry, register_preset, register_theme,
+                          theme_registry)
+
+    _presets_available = True
+except ImportError:
+    _presets_available = False
+    KeyboardPreset = None
+    KeyboardTheme = None
+    KeyboardPresetRegistry = None
+    KeyboardThemeRegistry = None
+    preset_registry = None
+    theme_registry = None
+    register_preset = None
+    register_theme = None
+
 # Validation hooks and middleware
 try:
     from .hooks import (ButtonValidator, KeyboardHookManager, ValidationHook,
@@ -131,6 +149,15 @@ __all__ = [
     "build_inline_keyboard",
     "build_reply_keyboard",
     "keyboard_factory",
+    # Preset and theme utilities
+    "KeyboardPreset",
+    "KeyboardPresetRegistry",
+    "KeyboardTheme",
+    "KeyboardThemeRegistry",
+    "preset_registry",
+    "theme_registry",
+    "register_preset",
+    "register_theme",
     # Validation System
     "ButtonValidator",
     "KeyboardHookManager",

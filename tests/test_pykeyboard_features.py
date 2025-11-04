@@ -4,7 +4,9 @@ import pytest
 
 pytest.importorskip("pydantic")
 
+from pykeyboard.builder import KeyboardBuilder, KeyboardFactory
 from pykeyboard.inline_keyboard import InlineButton, InlineKeyboard
+from pykeyboard.presets import preset_registry, theme_registry
 from pykeyboard.visualization import KeyboardVisualizer
 from pykeyboard.errors import LocaleError
 
@@ -94,3 +96,60 @@ def test_collect_performance_metrics_filters_operations():
 
     assert metrics
     assert metrics[0][0] == "to_json"
+
+
+def test_preset_builds_keyboard_with_theme_layers():
+    preset = preset_registry.get("confirmation")
+
+    keyboard = preset.build(
+        context={
+            "yes_text": "Agree",
+            "no_text": "Decline",
+            "callback_pattern": "decision_{action}",
+            "text_prefix": "👉 ",
+            "callback_namespace": "flow",
+            "footer": {"text": "Need help?", "callback_data": "help"},
+        },
+        themes=("text_prefix", "callback_namespace", "footer"),
+    )
+
+    rows = keyboard.keyboard
+    assert rows[0][0].text.startswith("👉 ")
+    assert rows[0][0].callback_data == "flow:decision_yes"
+    assert rows[-1][0].text == "Need help?"
+
+
+def test_builder_apply_preset_resolves_theme_names():
+    builder = KeyboardBuilder(InlineKeyboard(row_width=2))
+
+    builder.apply_preset(
+        "menu",
+        context={
+            "menu_items": {"Home": "home", "Settings": "settings"},
+            "callback_pattern": "nav_{action}",
+            "callback_namespace": "demo",
+        },
+        themes=("callback_namespace",),
+        theme_registry=theme_registry,
+    )
+
+    keyboard = builder.build()
+    callbacks = [
+        button.callback_data
+        for row in keyboard.keyboard
+        for button in row
+        if isinstance(button, InlineButton)
+    ]
+
+    assert all(callback.startswith("demo:nav_") for callback in callbacks)
+    assert keyboard.row_width == 2
+
+
+def test_keyboard_factory_allows_theme_context_overrides():
+    keyboard = KeyboardFactory.create_confirmation_keyboard(
+        themes=("text_prefix",),
+        extra_context={"text_prefix": "🔥 "},
+    )
+
+    first_button = keyboard.keyboard[0][0]
+    assert first_button.text.startswith("🔥 ")
