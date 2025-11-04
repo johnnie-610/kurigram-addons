@@ -4,6 +4,8 @@
 > This library is a collection of popular Addons and patches for pyrogram/Kurigram.
 > Currently, Pykeyboard and Pyrogram-patch have been added. You're welcome to add more.
 
+> 📘 **Documentation** is available at [johnnie-610.github.io/kurigram-addons](https://johnnie-610.github.io/kurigram-addons/), featuring learnings, tutorials, and API references for PyKeyboard and Pyrogram Patch.
+
 # Installation
 > PLEASE DON'T USE THE PYPI VERSION OF THIS LIBRARY. IT'S OUTDATED.
 ## using pip  

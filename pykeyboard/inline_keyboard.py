@@ -897,10 +897,12 @@ class InlineKeyboard(KeyboardBase):
             ValidationError: If the JSON data is invalid or malformed.
 
         Example:
+            ```pycon
             >>> json_str = '{"row_width":3,"keyboard":[[{"text":"Test","callback_data":"test"}]]}'
             >>> keyboard = InlineKeyboard.from_json(json_str)
             >>> keyboard.keyboard[0][0].text
             'Test'
+            ```
         """
         return cls.model_validate_json(json_str)
 

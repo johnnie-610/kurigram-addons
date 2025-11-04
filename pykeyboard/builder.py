@@ -200,7 +200,7 @@ class KeyboardBuilder:
         return button
 
     def add_button(
-        self, text: str, callback_data: Optional[str] = None, **kwargs
+        self, text: str, callback_data: Optional[str] = None, **kwargs: Any
     ) -> "KeyboardBuilder":
         """Add a single button to the keyboard.
 
@@ -291,7 +291,7 @@ class KeyboardBuilder:
         condition: bool,
         text: str,
         callback_data: Optional[str] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> "KeyboardBuilder":
         """Add a button only if condition is True.
 

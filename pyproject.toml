@@ -41,6 +41,13 @@ pydantic-settings = "^2.10.1"
 repository = "https://github.com/johnnie-610/kurigram-addons"
 bugs = "https://github.com/johnnie-610/kurigram-addons/issues"
 
+[project.optional-dependencies]
+docs = [
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.25.0",
+    "mkdocs-minify-plugin>=0.7.2",
+]
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -69,6 +76,7 @@ python_functions = ["test_*", "*test_*"]
 python_classes = ["Test*", "*Test*"]
 addopts = "-v -s --asyncio-mode=auto"
 asyncio_mode = "auto"
+
 
 [tool.black]
 line-length = 80
