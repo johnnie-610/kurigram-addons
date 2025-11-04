@@ -207,6 +207,9 @@ def create_decorator_method(
                     logger.error(f"Error in handler {func.__name__}: {e}")
                     raise
 
+            # Mark wrapper so dispatcher knows to supply patch features
+            wrapper.__pyrogram_patch_requires_helper__ = True
+
             # Always try to register or store the handler
             if handler_class is not None and PYROGRAM_AVAILABLE:
                 # If client is already set, register immediately

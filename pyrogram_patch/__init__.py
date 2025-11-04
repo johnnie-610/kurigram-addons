@@ -8,12 +8,15 @@
 # file that was distributed with this source code
 
 
+from pyrogram_patch.health import create_health_router
 from pyrogram_patch.patch import PatchManager, patch
 
 __all__ = [
     # patch
     "PatchManager",
     "patch",
+    # health
+    "create_health_router",
     # middlewares
     "middleware_types",
 ]
