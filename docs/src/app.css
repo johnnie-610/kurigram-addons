@@ -1,0 +1,105 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Primary: Tokio Blue spectrum */
+  --color-primary-50: #e0f7ff;
+  --color-primary-100: #b3ebff;
+  --color-primary-200: #80ddff;
+  --color-primary-300: #4dceff;
+  --color-primary-400: #26c3ff;
+  --color-primary-500: #00a8e8; /* The classic Tokio Blue */
+  --color-primary-600: #0096d1;
+  --color-primary-700: #0081b5;
+  --color-primary-800: #006c99;
+  --color-primary-900: #004d6e;
+  --color-primary-950: #002d40;
+
+  /* Accent: Slate/Grey spectrum for minimalist feel */
+  --color-accent-50: #f8fafc;
+  --color-accent-100: #f1f5f9;
+  --color-accent-200: #e2e8f0;
+  --color-accent-300: #cbd5e1;
+  --color-accent-400: #94a3b8;
+  --color-accent-500: #64748b;
+  --color-accent-600: #475569;
+  --color-accent-700: #334155;
+  --color-accent-800: #1e293b;
+  --color-accent-900: #0f172a;
+  --color-accent-950: #020617;
+
+  /* Tokio Backgrounds */
+  --color-tokio-bg: #0B0E14;
+  --color-tokio-card: #161B22;
+  --color-tokio-border: #30363D;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-slate-800 antialiased transition-colors duration-500 selection:bg-primary-100 selection:text-primary-900;
+  }
+  
+  :root.dark body {
+    @apply bg-tokio-bg text-slate-100 selection:bg-primary-900/50 selection:text-primary-100;
+  }
+
+  h1, h2, h3, h4 {
+    @apply tracking-tighter font-black;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white border border-slate-200 shadow-sm transition-all duration-300;
+  }
+
+  .dark .glass-card {
+    @apply bg-tokio-card border-tokio-border shadow-2xl;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  .glass-header {
+    @apply sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200;
+  }
+
+  .dark .glass-header {
+    @apply bg-tokio-bg/80 border-tokio-border;
+  }
+
+  .glass-sidebar {
+    @apply bg-slate-50 border-r border-slate-200;
+  }
+
+  .dark .glass-sidebar {
+    @apply bg-tokio-bg border-tokio-border;
+  }
+
+  /* Improved visibility for slate-500 in light mode */
+  .text-slate-500 {
+    @apply text-slate-600 dark:text-slate-400;
+  }
+
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent dark:from-primary-500 dark:to-primary-300;
+  }
+
+  .premium-shadow {
+    @apply shadow-lg;
+  }
+  
+  .dark .premium-shadow {
+    @apply shadow-2xl;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Code Animation Utilities */
+  .code-reveal {
+    @apply opacity-0 translate-y-2 transition-all duration-700 ease-out;
+  }
+
+  .code-reveal.visible {
+    @apply opacity-100 translate-y-0;
+  }
+}

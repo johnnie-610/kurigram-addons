@@ -1,260 +1,177 @@
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025-2026 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
 from __future__ import annotations
 
 import asyncio
+import heapq
+import logging
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, AsyncIterator, cast, Union
+from typing import Any, Dict, List, Optional, Tuple
 
-from pyrogram_patch.fsm.base_storage import (
-    BaseStorage,
-    StateData,
-    StorageError,
-    StateNotFoundError,
-    StateValidationError,
-)
-from pyrogram_patch.fsm.states import State
+from pyrogram_patch.fsm.base_storage import BaseStorage
+
+logger = logging.getLogger("pyrogram_patch.fsm.memory_storage")
 
 
 class MemoryStorage(BaseStorage):
-    """In-memory implementation of BaseStorage.
-    
-    This implementation stores all state data in memory and is not persistent
-    between application restarts. It's suitable for development and testing.
-    
-    Note: This implementation is thread-safe.
+    """In-memory FSM storage.
+
+    Intended for testing or small bots where persistence is not required.
     """
-    
-    def __init__(self) -> None:
-        """Initialize a new MemoryStorage instance."""
-        self._storage: Dict[str, StateData] = {}
+
+    def __init__(
+        self, *, default_ttl: int = 0, cleanup_interval: float = 5.0
+    ) -> None:
+        self._default_ttl = int(default_ttl)
+        self._data: Dict[str, Tuple[Dict[str, Any], Optional[float]]] = {}
         self._lock = asyncio.Lock()
 
-    async def _get_state_data(self, key: str) -> StateData:
-        """Get state data with validation."""
-        if key not in self._storage:
-            raise StateNotFoundError(f"State with key '{key}' not found")
-        return self._storage[key]
+        # Event-driven cleanup using priority queue
+        # Format: (expiration_time, identifier)
+        self._expiration_queue: List[Tuple[float, str]] = []
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_event = asyncio.Event()
 
-    async def _check_expired(self, key: str) -> bool:
-        """Check if a state has expired and clean it up if needed."""
-        try:
-            state_data = await self._get_state_data(key)
-            if state_data.expires_at and datetime.now(timezone.utc) >= state_data.expires_at:
-                await self.finish_state(key)
-                return True
-            return False
-        except StateNotFoundError:
-            return True
+    async def start(self) -> None:
+        if self._cleanup_task and not self._cleanup_task.done():
+            return
+        self._cleanup_task = asyncio.create_task(self._event_driven_cleanup())
 
-    async def get_or_create_state(
-        self,
-        key: str,
-        default_state: Optional[str] = None,
-        ttl: Optional[timedelta] = None
-    ) -> State:
-        """Get an existing state or create a new one if it doesn't exist."""
-        if not key:
-            raise StateValidationError("Key cannot be empty")
-            
-        async with self._lock:
+    async def stop(self) -> None:
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
             try:
-                state_data = await self._get_state_data(key)
-                if not await self._check_expired(key):
-                    return State(state_data.state, self, key)
-            except StateNotFoundError:
+                await self._cleanup_task
+            except asyncio.CancelledError:
                 pass
-                
-            # Create new state
-            now = datetime.now(timezone.utc)
-            state = default_state or "*"
-            expires_at = (now + ttl) if ttl else None
-            
-            state_data = StateData(
-                state=state,
-                data={},
-                created_at=now,
-                updated_at=now,
-                expires_at=expires_at
-            )
-            
-            self._storage[key] = state_data
-            return State(state, self, key)
+        self._cleanup_task = None
 
-    async def get_state(self, key: str, raise_on_not_found: bool = False) -> Optional[StateData]:
-        """Get the state data for a given key.
-        
-        Args:
-            key: The key to identify the state
-            raise_on_not_found: If True, raises StateNotFoundError when key is not found
-            
-        Returns:
-            The StateData object if found, None otherwise
-            
-        Raises:
-            StateNotFoundError: If the key is not found and raise_on_not_found is True
-        """
+    async def health(self) -> bool:
+        """Check if storage is healthy."""
+        return True
+
+    async def _event_driven_cleanup(self) -> None:
+        """Event-driven cleanup that only runs when items actually expire."""
         try:
-            return await self._get_state_data(key)
-        except StateNotFoundError:
-            if raise_on_not_found:
-                raise
-            return None
+            while True:
+                if not self._expiration_queue:
+                    await self._cleanup_event.wait()
+                    self._cleanup_event.clear()
+                    continue
+
+                next_expiry, _ = self._expiration_queue[0]
+                now = time.time()
+
+                if next_expiry <= now:
+                    await self._prune_expired()
+                else:
+                    sleep_time = max(0.1, next_expiry - now)
+                    try:
+                        await asyncio.wait_for(
+                            self._cleanup_event.wait(), timeout=sleep_time
+                        )
+                        self._cleanup_event.clear()
+                    except asyncio.TimeoutError:
+                        await self._prune_expired()
+
+        except asyncio.CancelledError:
+            return
+
+    async def _prune_expired(self) -> None:
+        """Remove all expired items from the priority queue and data store."""
+        now = time.time()
+        expired_keys = []
+
+        async with self._lock:
+            while (
+                self._expiration_queue and self._expiration_queue[0][0] <= now
+            ):
+                _, key = heapq.heappop(self._expiration_queue)
+                if key in self._data:
+                    expired_keys.append(key)
+
+            for key in expired_keys:
+                self._data.pop(key, None)
+                logger.debug("Pruned expired key=%s", key)
+
+    def _schedule_cleanup(
+        self, identifier: str, expiry: Optional[float]
+    ) -> None:
+        """Schedule cleanup for an item with expiry time."""
+        if expiry is not None:
+            heapq.heappush(self._expiration_queue, (expiry, identifier))
+            self._cleanup_event.set()
 
     async def set_state(
         self,
-        key: str,
-        state_data: StateData,
+        identifier: str,
+        state: Dict[str, Any],
+        *,
+        ttl: Optional[int] = None,
     ) -> None:
-        """Set state for a given key.
-        
-        Args:
-            key: The key to identify the state
-            state_data: The state data to store
-        """
-        if not isinstance(state_data, StateData):
-            raise ValueError("state_data must be an instance of StateData")
-            
-        now = datetime.now(timezone.utc)
-        expires_at = None
-        
-        # Set expires_at if TTL is configured
-        if hasattr(self, 'ttl') and self.ttl > 0:
-            expires_at = now + timedelta(seconds=self.ttl)
-            
-        # Create a new StateData with updated timestamps
-        updated_state_data = StateData(
-            state=state_data.state,
-            data=state_data.data,
-            created_at=state_data.created_at or now,
-            updated_at=now,
-            expires_at=expires_at if expires_at else state_data.expires_at
-        )
-            
+        ttl_use = self._default_ttl if ttl is None else int(ttl)
+        exp = time.time() + ttl_use if ttl_use > 0 else None
         async with self._lock:
-            self._storage[key] = updated_state_data
+            self._data[identifier] = (state, exp)
+            if exp is not None:
+                self._schedule_cleanup(identifier, exp)
 
-    async def set_data(
+    async def get_state(self, identifier: str) -> Optional[Dict[str, Any]]:
+        async with self._lock:
+            entry = self._data.get(identifier)
+            if not entry:
+                return None
+            state, exp = entry
+            if exp and exp <= time.time():
+                self._data.pop(identifier, None)
+                return None
+            return state
+
+    async def delete_state(self, identifier: str) -> bool:
+        async with self._lock:
+            return self._data.pop(identifier, None) is not None
+
+    async def compare_and_set(
         self,
-        data: Dict[str, Any],
-        key: str,
-        ttl: Optional[timedelta] = None
-    ) -> None:
-        """Update the data for a given state."""
-        if not isinstance(data, dict):
-            raise StateValidationError("Data must be a dictionary")
-            
-        # Check data size
-        data_size = len(str(data).encode('utf-8'))
-        if data_size > self.MAX_DATA_SIZE:
-            raise StateValidationError(
-                f"Data size {data_size} exceeds maximum allowed {self.MAX_DATA_SIZE}"
-            )
-            
+        identifier: str,
+        new_state: Dict[str, Any],
+        *,
+        expected_state: Optional[Dict[str, Any]] = None,
+        ttl: Optional[int] = None,
+    ) -> bool:
+        ttl_use = self._default_ttl if ttl is None else int(ttl)
+        exp = time.time() + ttl_use if ttl_use > 0 else None
         async with self._lock:
-            now = datetime.now(timezone.utc)
-            expires_at = (now + ttl) if ttl else None
-            
-            try:
-                existing_data = await self._get_state_data(key)
-                state_data = StateData(
-                    state=existing_data.state,
-                    data=data,
-                    created_at=existing_data.created_at,
-                    updated_at=now,
-                    expires_at=expires_at
-                )
-            except StateNotFoundError:
-                state_data = StateData(
-                    state="*",
-                    data=data,
-                    created_at=now,
-                    updated_at=now,
-                    expires_at=expires_at
-                )
-            
-            self._storage[key] = state_data
+            entry = self._data.get(identifier)
+            if expected_state is None:
+                if entry is not None:
+                    return False
+            else:
+                current, _ = entry if entry else (None, None)
+                if current != expected_state:
+                    return False
+            self._data[identifier] = (new_state, exp)
+            if exp is not None:
+                self._schedule_cleanup(identifier, exp)
+            return True
 
-    async def get_data(self, key: str) -> Dict[str, Any]:
-        """Get the data for a given key."""
-        async with self._lock:
-            if await self._check_expired(key):
-                return {}
-                
-            try:
-                state_data = await self._get_state_data(key)
-                return state_data.data
-            except StateNotFoundError:
-                return {}
+    async def list_keys(self, pattern: str = "*") -> list[str]:
+        import fnmatch
 
-    async def get_state_data(self, key: str) -> StateData:
-        """Get the state data for a given key."""
         async with self._lock:
-            if await self._check_expired(key):
-                raise StateNotFoundError(f"State with key '{key}' not found or expired")
-                
-            state_data = self._storage[key]
-            # Return a copy to prevent modification of internal state
-            return StateData(
-                state=state_data.state,
-                data=state_data.data.copy(),
-                created_at=state_data.created_at,
-                updated_at=state_data.updated_at,
-                expires_at=state_data.expires_at
-            )
+            if pattern == "*":
+                return list(self._data.keys())
+            return [k for k in self._data if fnmatch.fnmatch(k, pattern)]
 
-    async def finish_state(self, key: str) -> None:
-        """Remove the state for a given key."""
+    async def clear_namespace(self) -> int:
         async with self._lock:
-            self._storage.pop(key, None)
-            
-    async def delete_state(self, key: str) -> None:
-        """Alias for finish_state for compatibility with tests."""
-        await self.finish_state(key)
-        
-    async def _cleanup(self) -> None:
-        """Internal method to clean up expired states."""
-        if not hasattr(self, 'ttl') or self.ttl <= 0:
-            return
-            
-        async with self._lock:
-            now = datetime.now(timezone.utc)
-            keys_to_remove = []
-            
-            for key, state_data in list(self._storage.items()):
-                if state_data.expires_at and state_data.expires_at <= now:
-                    keys_to_remove.append(key)
-                    
-            for key in keys_to_remove:
-                self._storage.pop(key, None)
-
-    async def cleanup_expired(self) -> int:
-        """Remove all expired states and return the count of removed states."""
-        count = 0
-        async with self._lock:
-            keys_to_remove = []
-            for key in list(self._storage.keys()):
-                if await self._check_expired(key):
-                    keys_to_remove.append(key)
-                    
-            for key in keys_to_remove:
-                self._storage.pop(key, None)
-                count += 1
-            for key in keys:
-                if key in self._storage and await self._check_expired(key):
-                    count += 1
-        return count
-
-    async def list_states(
-        self,
-        state: Optional[str] = None,
-        created_before: Optional[datetime] = None
-    ) -> AsyncIterator[str]:
-        """List all states matching the given criteria."""
-        async with self._lock:
-            for key, state_data in self._storage.items():
-                if state is not None and state_data.state != state:
-                    continue
-                if created_before is not None and state_data.created_at >= created_before:
-                    continue
-                if not await self._check_expired(key):
-                    yield key
+            count = len(self._data)
+            self._data.clear()
+            return count

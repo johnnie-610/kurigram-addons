@@ -111,7 +111,9 @@ venv.bak/
 .mypy_cache/
 
 # DEV STUFF
+.poetry-cache
+x.py
+pykeyboard docs/
 
 # Update handlers
 update_handlers.py
-

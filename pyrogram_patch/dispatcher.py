@@ -1,307 +1,379 @@
-import asyncio
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025-2026 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
+
+
 import inspect
 import logging
-from contextlib import suppress
-from typing import Any, Dict, List, Optional, Set, Type, Union, cast
+import time
+from typing import Any, Dict, Iterable, Optional
 
 import pyrogram
-from pyrogram.dispatcher import Dispatcher as PyrogramDispatcher
-from pyrogram.handlers.handler import Handler
+from pyrogram.dispatcher import Dispatcher, log
 from pyrogram.handlers import RawUpdateHandler
-from pyrogram.types import Update, User, Chat
+from pyrogram.types import CallbackQuery, Message
 
-from .patch_data_pool import PatchDataPool
-from .patch_helper import PatchHelper
-from pyrogram_patch.fsm.base_storage import BaseStorage
+from pyrogram_patch.middlewares import PatchHelper
 
-# Type aliases for better readability
-HandlerType = Type[Handler]
-MiddlewareType = Any  # Could be more specific based on middleware implementation
+from .circuit_breaker import CircuitBreakerOpenException
+from .config import get_config
+from .patch_data_pool import initialize_global_pool
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pyrogram_patch.dispatcher")
 
-class PatchedDispatcher(PyrogramDispatcher):
-    """Enhanced dispatcher with middleware support and improved update handling.
-    
-    This class extends Pyrogram's default dispatcher to add:
-    - Middleware support for processing updates
-    - Better error handling and logging
-    - Thread-safe operations
-    - Improved type hints and documentation
-    """
-    
+
+class PatchedDispatcher(Dispatcher):
     def __init__(self, client: pyrogram.Client):
-        """Initialize the patched dispatcher.
-        
-        Args:
-            client: The Pyrogram client instance
-        """
         super().__init__(client)
-        self._is_running = False
-        self._tasks: Set[asyncio.Task] = set()
-        
-    async def start(self) -> None:
-        """Start the dispatcher and its worker tasks."""
-        if self._is_running:
-            logger.warning("Dispatcher is already running")
-            return
-            
-        self._is_running = True
-        # Start multiple workers for better concurrency
-        for _ in range(5):  # Configurable number of workers
-            task = asyncio.create_task(self._worker())
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
-            
-    async def stop(self) -> None:
-        """Stop the dispatcher and clean up resources."""
-        if not self._is_running:
-            return
-            
-        self._is_running = False
-        # Signal workers to stop
-        for _ in self._tasks:
-            await self.updates_queue.put(None)
-            
-        # Wait for all tasks to complete
-        if self._tasks:
-            await asyncio.wait(self._tasks)
-            
-    async def _worker(self) -> None:
-        """Worker coroutine that processes updates from the queue."""
-        while self._is_running:
-            try:
-                packet = await self.updates_queue.get()
-                if packet is None:  # Shutdown signal
-                    break
-                    
-                await self._process_packet(packet)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.exception("Error in worker: %s", str(e))
-                
-    async def _process_packet(self, packet: tuple) -> None:
-        """Process a single update packet.
-        
-        Args:
-            packet: A tuple containing (update, users, chats)
-        """
-        update, users, chats = packet
-        parser = self.update_parsers.get(type(update))
-        
-        if parser is None:
-            return
-            
-        try:
-            parsed_updates, handler_type = await parser(update, users, chats)
-            if parsed_updates is None:
-                return
-                
-            async with self.locks[0]:  # Use the first lock for now
-                await self._process_update(update, parsed_updates, handler_type, users, chats)
-                
-        except Exception as e:
-            logger.exception("Error processing update: %s", str(e))
-            
-    async def _process_update(
-        self,
-        update: Update,
-        parsed_updates: Any,
-        handler_type: Type[Handler],
-        users: Dict[int, User],
-        chats: Dict[int, Chat]
-    ) -> None:
-        """Process a single update with the appropriate handlers.
-        
-        Args:
-            update: The raw update object
-            parsed_updates: The parsed update(s)
-            handler_type: The type of handler to use
-            users: User dictionary from the update
-            chats: Chat dictionary from the update
-        """
-        # Create and register the patch helper
-        patch_helper = PatchHelper()
-        PatchDataPool.include_helper_to_pool(parsed_updates, patch_helper)
+        # Initialize pool access
+        self.pool = None
 
-        try:
-            # Process FSM state if storage is available
-            if PatchDataPool.pyrogram_patch_fsm_storage:
-                await patch_helper._include_state(
-                    parsed_updates,
-                    PatchDataPool.pyrogram_patch_fsm_storage,
-                    self.client
+    async def start(self) -> None:
+        """Override start to trigger startup hooks."""
+        if self.pool is None:
+            self.pool = await initialize_global_pool(self.client)
+        
+        await self.pool.trigger_event("startup")
+        await super().start()
+
+    async def stop(self, clear_handlers: bool = True) -> None:
+        """Override stop to trigger shutdown hooks."""
+        if self.pool:
+            await self.pool.trigger_event("shutdown")
+        await super().stop(clear_handlers=clear_handlers)
+
+    async def handler_worker(self, lock):
+        """Process update packets using either patched or plain handling."""
+
+        if self.pool is None:
+            self.pool = await initialize_global_pool(self.client)
+
+        while True:
+            packet = await self.updates_queue.get()
+
+            if packet is None:
+                break
+
+            try:
+                update, users, chats = packet
+                parser = self.update_parsers.get(type(update))
+
+                parsed_update, handler_type = (
+                    await parser(update, users, chats)
+                    if parser is not None
+                    else (None, type(None))
                 )
 
-            # Process outer middlewares
-            for middleware in PatchDataPool.pyrogram_patch_outer_middlewares:
-                if middleware == handler_type:
-                    await self._process_middleware(
-                        middleware, parsed_updates, patch_helper
+                # Preparation phase (concurrency optimization)
+                # We prepare the helper outside the lock if we might need it.
+                # If there are no middlewares and no handler needs it, we skip it.
+                # However, to avoid double-calculating requires_patch, we just 
+                # check if middlewares exist.
+                
+                patch_helper: Optional[PatchHelper] = None
+                if self.pool._middleware_manager._middlewares:
+                    patch_helper = await self._prepare_patch_helper(
+                        parsed_update, handler_type
                     )
 
-            # Process handlers
-            for group in self.groups.values():
-                for handler in group:
-                    if isinstance(handler, handler_type):
-                        await self._process_handler(
-                            handler, parsed_updates, patch_helper
-                        )
-                    elif isinstance(handler, RawUpdateHandler):
-                        await self._process_raw_handler(
-                            handler, update, users, chats, patch_helper
-                        )
+                async with lock:
+                    handled = False
 
-        except Exception as e:
-            logger.exception("Error in update processing: %s", str(e))
-        finally:
-            # Clean up
-            PatchDataPool.exclude_helper_from_pool(parsed_updates)
-            
-    async def _process_middleware(
-        self,
-        middleware: MiddlewareType,
-        update: Any,
-        patch_helper: PatchHelper
-    ) -> None:
-        """Process a middleware with the given update.
-        
-        Args:
-            middleware: The middleware to process
-            update: The update to process
-            patch_helper: The patch helper instance
-        """
-        try:
-            await patch_helper._process_middleware(
-                update, middleware, self.client
-            )
-        except Exception as e:
-            logger.exception("Error in middleware %s: %s", middleware.__name__, str(e))
-            
-    async def _process_handler(
-        self,
-        handler: Handler,
-        parsed_updates: Any,
-        patch_helper: PatchHelper
-    ) -> None:
-        """Process a handler with the given update.
-        
-        Args:
-            handler: The handler to process
-            parsed_updates: The parsed update(s)
-            patch_helper: The patch helper instance
-        """
-        try:
-            if await self._should_process_handler(handler, parsed_updates, patch_helper):
-                await self._execute_handler(handler, parsed_updates, patch_helper)
-        except Exception as e:
-            logger.exception("Error in handler %s: %s", handler.callback.__name__, str(e))
-            
-    async def _process_raw_handler(
-        self,
-        handler: RawUpdateHandler,
-        update: Update,
-        users: Dict[int, User],
-        chats: Dict[int, Chat],
-        patch_helper: PatchHelper
-    ) -> None:
-        """Process a raw update handler.
-        
-        Args:
-            handler: The raw update handler
-            update: The raw update
-            users: User dictionary
-            chats: Chat dictionary
-            patch_helper: The patch helper instance
-        """
-        try:
-            await self._execute_raw_handler(handler, update, users, chats, patch_helper)
-        except Exception as e:
-            logger.exception("Error in raw handler: %s", str(e))
-            
-    async def _should_process_handler(
-        self,
-        handler: Handler,
-        parsed_updates: Any,
-        patch_helper: PatchHelper
+                    for group in self.groups.values():
+                        for handler in group:
+                            try:
+                                use_patch = self._handler_requires_patch_features(
+                                    handler, handler_type
+                                )
+
+                                if use_patch:
+                                    if patch_helper is None:
+                                        # Lazy initialization if not already prepared
+                                        patch_helper = await self._prepare_patch_helper(
+                                            parsed_update, handler_type
+                                        )
+
+                                    if patch_helper is None:
+                                        continue
+
+                                    handled = await self._execute_with_patch(
+                                        handler,
+                                        parsed_update,
+                                        update,
+                                        users,
+                                        chats,
+                                        handler_type,
+                                        patch_helper,
+                                    )
+                                else:
+                                    handled = await self._execute_plain(
+                                        handler,
+                                        parsed_update,
+                                        update,
+                                        users,
+                                        chats,
+                                        handler_type,
+                                    )
+                            except pyrogram.ContinuePropagation:
+                                continue
+                            except pyrogram.StopPropagation:
+                                raise
+                            except CircuitBreakerOpenException as cb_exc:
+                                log.warning(
+                                    "Circuit breaker open while handling %s: %s",
+                                    type(parsed_update).__name__ if parsed_update else "RawUpdate",
+                                    cb_exc,
+                                )
+                                notified = await self._handle_circuit_breaker_failure(
+                                    parsed_update or update, cb_exc
+                                )
+                                if patch_helper is not None:
+                                    await self.pool.exclude_helper_from_pool(
+                                        parsed_update or update, self.client
+                                    )
+
+                                handled = notified
+                                break
+                            except Exception as e:
+                                log.exception(e)
+                                continue
+
+                            if handled:
+                                break
+
+                        if handled:
+                            break
+
+                if patch_helper is not None:
+                    await self.pool.exclude_helper_from_pool(
+                        parsed_update or update, self.client
+                    )
+
+            except pyrogram.StopPropagation:
+                pass
+            except Exception as e:
+                log.exception(e)
+
+    def _handler_requires_patch_features(
+        self, handler, handler_type: type
     ) -> bool:
-        """Check if a handler should process the update.
+        """Determine whether a handler should be executed with patch features."""
+
+        callback = handler.callback
         
-        Args:
-            handler: The handler to check
-            parsed_updates: The parsed update(s)
-            patch_helper: The patch helper instance
-            
-        Returns:
-            bool: True if the handler should process the update
-        """
+        # Check for cached result or explicit flag
+        requires_helper = getattr(callback, "__pyrogram_patch_requires_helper__", None)
+        if requires_helper is not None:
+            return requires_helper
+
+        # If there are global middlewares, the answer is always yes for now
+        # because middlewares might need the helper/state.
+        if self.pool._middleware_manager._middlewares:
+            # We don't cache this strictly because middlewares might be added/removed
+            # (though normally they are static after setup)
+            return True
+
         try:
-            return await handler.check(self.client, parsed_updates)
-        except Exception as e:
-            logger.exception("Error in handler check: %s", str(e))
+            signature = inspect.signature(callback)
+            parameters = signature.parameters
+            
+            result = False
+            if "patch_helper" in parameters:
+                result = True
+            elif "state" in parameters and self.pool.pyrogram_patch_fsm_storage:
+                result = True
+            
+            # Cache the result for next time
+            try:
+                callback.__pyrogram_patch_requires_helper__ = result
+            except (AttributeError, TypeError):
+                # Fallback if we can't set attribute (e.g. some built-ins or slots)
+                pass
+                
+            return result
+        except (TypeError, ValueError):
             return False
+
+    async def _prepare_patch_helper(
+        self, parsed_update, handler_type: type
+    ) -> Optional[PatchHelper]:
+        """Create and register a PatchHelper for the current update."""
+
+        try:
+            patch_helper = PatchHelper()
+            # Record receipt timestamp for latency analysis
+            await patch_helper.update_data(__received_at__=time.time())
             
-    async def _execute_handler(
-        self,
-        handler: Handler,
-        parsed_updates: Any,
-        patch_helper: PatchHelper
-    ) -> None:
-        """Execute a handler with the given update.
-        
-        Args:
-            handler: The handler to execute
-            parsed_updates: The parsed update(s)
-            patch_helper: The patch helper instance
-        """
-        kwargs = await patch_helper._get_data_for_handler(
-            handler.callback.__code__.co_varnames
-        )
-        
-        if inspect.iscoroutinefunction(handler.callback):
-            await handler.callback(self.client, parsed_updates, **kwargs)
-        else:
-            # Run synchronous callbacks in executor
-            await self.loop.run_in_executor(
-                self.client.executor,
-                handler.callback,
-                self.client,
-                parsed_updates,
-                **kwargs
+            await self.pool.include_helper_to_pool(
+                update=parsed_update, helper=patch_helper, client=self.client
             )
+
+            if self.pool.pyrogram_patch_fsm_storage:
+                await patch_helper._include_state(
+                    parsed_update,
+                    self.pool.pyrogram_patch_fsm_storage,
+                    self.client,
+                )
+
+            return patch_helper
+        except Exception as e:  # pragma: no cover - defensive logging
+            log.exception(e)
+            return None
+
+    async def _execute_with_patch(
+        self,
+        handler,
+        parsed_update,
+        update,
+        users,
+        chats,
+        handler_type: type,
+        patch_helper: PatchHelper,
+    ) -> bool:
+        """Execute a handler with patch-helper enhancements inside the middleware chain."""
+
+        if isinstance(handler, handler_type):
+            update_to_check = parsed_update
+        elif isinstance(handler, RawUpdateHandler):
+            update_to_check = update
+        else:
+            return False
+
+        try:
+            if not await handler.check(self.client, update_to_check):
+                return False
+
+            # Wrap the entire handler execution in the middleware chain
+            chain_executor = self.pool._middleware_manager.wrap_handler(
+                handler.callback,
+                parsed_update,
+                self.client,
+                patch_helper
+            )
+
+            kwargs = await patch_helper._get_data_for_handler(handler.callback)
             
-    async def _execute_raw_handler(
+            # The chain returns the result of the handler
+            await chain_executor(**kwargs)
+
+        except pyrogram.StopPropagation:
+            raise
+        except pyrogram.ContinuePropagation:
+            return False
+        except Exception as e:
+            log.exception(e)
+            return False
+
+        return True
+
+    async def _execute_plain(
         self,
-        handler: RawUpdateHandler,
-        update: Update,
-        users: Dict[int, User],
-        chats: Dict[int, Chat],
-        patch_helper: PatchHelper
-    ) -> None:
-        """Execute a raw update handler.
-        
-        Args:
-            handler: The raw update handler
-            update: The raw update
-            users: User dictionary
-            chats: Chat dictionary
-            patch_helper: The patch helper instance
-        """
-        kwargs = await patch_helper._get_data_for_handler(
-            handler.callback.__code__.co_varnames
-        )
-        
-        if inspect.iscoroutinefunction(handler.callback):
-            await handler.callback(self.client, update, users, chats, **kwargs)
+        handler,
+        parsed_update,
+        update,
+        users,
+        chats,
+        handler_type: type,
+    ) -> bool:
+        """Execute a handler using vanilla Pyrogram behaviour."""
+
+        args: Optional[tuple] = None
+
+        if isinstance(handler, handler_type):
+            try:
+                if await handler.check(self.client, parsed_update):
+                    args = (parsed_update,)
+            except Exception as e:
+                log.exception(e)
+                return False
+        elif isinstance(handler, RawUpdateHandler):
+            try:
+                if await handler.check(self.client, update):
+                    args = (update, users, chats)
+            except Exception as e:
+                log.exception(e)
+                return False
         else:
-            # Run synchronous callbacks in executor
-            await self.loop.run_in_executor(
-                self.client.executor,
-                handler.callback,
-                self.client,
-                update,
-                users,
-                chats,
-                **kwargs
+            return False
+
+        if args is None:
+            return False
+
+        try:
+            if inspect.iscoroutinefunction(handler.callback):
+                await handler.callback(self.client, *args)
+            else:
+                await self.client.loop.run_in_executor(
+                    self.client.executor,
+                    handler.callback,
+                    self.client,
+                    *args,
+                )
+        except pyrogram.StopPropagation:
+            raise
+        except pyrogram.ContinuePropagation:
+            return False
+        except Exception as e:
+            log.exception(e)
+            return False
+
+        return True
+
+    async def _handle_circuit_breaker_failure(
+        self, parsed_update, exc: CircuitBreakerOpenException
+    ) -> bool:
+        """Notify end users when a circuit breaker prevents handler execution."""
+
+        fallback = get_config().circuit_breaker.fallback_message.strip()
+        if not fallback:
+            return False
+
+        notified = False
+
+        try:
+            # Try to handle as Message
+            if isinstance(parsed_update, Message):
+                chat = getattr(parsed_update, "chat", None)
+                chat_id = getattr(chat, "id", None)
+                if chat_id is not None:
+                    await self.client.send_message(chat_id, fallback)
+                    notified = True
+
+            # Try to handle as CallbackQuery
+            if isinstance(parsed_update, CallbackQuery):
+                try:
+                    await parsed_update.answer(fallback, show_alert=True)
+                except TypeError:
+                    await parsed_update.answer(fallback)
+                notified = True
+            
+            # Try to handle via message attribute (e.g. EditedMessage)
+            elif not notified:
+                message = getattr(parsed_update, "message", None)
+                if message is not None:
+                    chat = getattr(message, "chat", None)
+                    chat_id = getattr(chat, "id", None)
+                    if chat_id is not None:
+                        await self.client.send_message(chat_id, fallback)
+                        notified = True
+
+            # Fallback: duck typing for chat attribute (for custom updates or tests)
+            if not notified:
+                chat = getattr(parsed_update, "chat", None)
+                chat_id = getattr(chat, "id", None)
+                if chat_id is not None:
+                    await self.client.send_message(chat_id, fallback)
+                    notified = True
+
+        except Exception as notify_error:  # pragma: no cover - defensive
+            logger.warning(
+                "Failed to deliver circuit breaker notification: %s",
+                notify_error,
             )
+
+        return notified

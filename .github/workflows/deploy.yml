@@ -1,32 +1,43 @@
-# name: Deploy to PyPI
+name: Deploy to PyPI
 
-# on:
-#   push:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
+    # tags:
+    #   - 'v*'
 
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
+jobs:
+  build-and-publish:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    
+    permissions:
+      id-token: write
+      contents: read
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+    environment:
+      name: pypi
+      url: https://pypi.org/p/kurigram-addons
 
-#       - name: Set up Python
-#         uses: actions/setup-python@v2
-#         with:
-#           python-version: 3.11
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Install Poetry
-#         run: |
-#           pip install poetry
-#           poetry install
+      - name: Install Poetry
+        run: pipx install "poetry>=2.0.0"
 
-#       - name: Build and publish to PyPI
-#         env:
-#           TWINE_USERNAME: __token__
-#           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-#         run: |
-#           poetry config http-basic.pypi __token__ ${{ secrets.PYPI_TOKEN }}
-#           poetry publish --build
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "poetry"
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Build package
+        run: poetry build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

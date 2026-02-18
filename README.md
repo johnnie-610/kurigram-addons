@@ -1,12 +1,15 @@
 <img align=center src=./logo.png length=80 width = 400>
 
-
 > This library is a collection of popular Addons and patches for pyrogram/Kurigram.
 > Currently, Pykeyboard and Pyrogram-patch have been added. You're welcome to add more.
 
+> 📘 **Documentation** is available at [johnnie-610.github.io/kurigram-addons](https://johnnie-610.github.io/kurigram-addons/), featuring learnings, tutorials, and API references for PyKeyboard and Pyrogram Patch.
+
 # Installation
+
 > PLEASE DON'T USE THE PYPI VERSION OF THIS LIBRARY. IT'S OUTDATED.
-## using pip  
+
+## using pip
 
 ```bash
 #bash
@@ -29,12 +32,12 @@ poetry add git+https://github.com/johnnie-610/kurigram-addons.git
 
 <div align="center">
 <p align="center">
-<img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/logo.png" alt="pykeyboard">
+<img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/logo.png" alt="pykeyboard">
 </p>
 
-![PyPI](https://img.shields.io/pypi/v/pykeyboard-kurigram)
-[![Downloads](https://pepy.tech/badge/pykeyboard-kurigram)](https://pepy.tech/project/pykeyboard-kurigram)
-![GitHub](https://img.shields.io/github/license/johnnie-610/pykeyboard)
+![PyPI](https://img.shields.io/pypi/v/kurigram-addons)
+[![Downloads](https://pepy.tech/badge/kurigram-addons)](https://pepy.tech/project/kurigram-addons)
+![GitHub](https://img.shields.io/github/license/johnnie-610/kurigram-addons)
 
  <p><h2>🎉This is pykeyboard for <a href="https://github.com/KurimuzonAkuma/pyrogram">Kurigram</a> 🎉</h2></p>
  <br>
@@ -47,8 +50,7 @@ poetry add git+https://github.com/johnnie-610/kurigram-addons.git
 - [Pykeyboard](#pykeyboard)
 - [What's new?](#whats-new)
 - [Documentation](#documentation)
-  - [Inline Keyboard](#inline-keyboard)
-        - [Parameters:](#parameters)
+  - [Inline Keyboard](#inline-keyboard) - [Parameters:](#parameters)
     - [Inline Keyboard add buttons](#inline-keyboard-add-buttons)
       - [Code](#code)
       - [Result](#result)
@@ -77,7 +79,7 @@ poetry add git+https://github.com/johnnie-610/kurigram-addons.git
       - [Code](#code-7)
       - [Result](#result-7)
   - [Reply Keyboard](#reply-keyboard)
-      - [Parameters:](#parameters-3)
+    - [Parameters:](#parameters-3)
     - [Reply Keyboard add buttons](#reply-keyboard-add-buttons)
       - [Code](#code-8)
       - [Result](#result-8)
@@ -123,7 +125,7 @@ keyboard.add(
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/add_inline_button.png" alt="add_inline_button"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/add_inline_button.png" alt="add_inline_button"></p>
 
 ### Inline Keyboard row buttons
 
@@ -148,7 +150,7 @@ keyboard.row(
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/row_inline_button.png" alt="row_inline_button"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/row_inline_button.png" alt="row_inline_button"></p>
 
 ### Pagination inline keyboard
 
@@ -175,7 +177,7 @@ keyboard.paginate(3, 3, 'pagination_keyboard:{number}')
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/pagination_keyboard_3.png" alt="pagination_keyboard_3"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/pagination_keyboard_3.png" alt="pagination_keyboard_3"></p>
 
 #### Pagination 5 pages
 
@@ -190,7 +192,7 @@ keyboard.paginate(5, 3, 'pagination_keyboard:{number}')
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/pagination_keyboard_5.png" alt="pagination_keyboard_5"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/pagination_keyboard_5.png" alt="pagination_keyboard_5"></p>
 
 #### Pagination 9 pages
 
@@ -205,7 +207,7 @@ keyboard.paginate(9, 5, 'pagination_keyboard:{number}')
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/pagination_keyboard_9.png" alt="pagination_keyboard_9"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/pagination_keyboard_9.png" alt="pagination_keyboard_9"></p>
 
 #### Pagination 100 pages
 
@@ -220,7 +222,7 @@ keyboard.paginate(100, 100, 'pagination_keyboard:{number}')
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/pagination_keyboard_100.png" alt="pagination_keyboard_100"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/pagination_keyboard_100.png" alt="pagination_keyboard_100"></p>
 
 #### Pagination 150 pages and buttons
 
@@ -239,7 +241,7 @@ keyboard.row(
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/pagination_keyboard_150.png" alt="pagination_keyboard_150"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/pagination_keyboard_150.png" alt="pagination_keyboard_150"></p>
 
 ### Languages inline keyboard
 
@@ -266,7 +268,6 @@ from pykeyboard import InlineKeyboard
   - uz_UZ - Uzbek
 - row_width (integer, default 2)
 
-
 #### Code
 
 ```python
@@ -281,7 +282,7 @@ keyboard.languages(
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/languages_keyboard.png" alt="languages_keyboard"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/languages_keyboard.png" alt="languages_keyboard"></p>
 
 ## Reply Keyboard
 
@@ -316,7 +317,7 @@ keyboard.add(
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/add_reply_button.png" alt="add_reply_button"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/add_reply_button.png" alt="add_reply_button"></p>
 
 ### Reply Keyboard row buttons
 
@@ -338,10 +339,9 @@ keyboard.row(ReplyButton('Reply button 5'))
 
 #### Result
 
-<p><img src="https://raw.githubusercontent.com/johnnie-610/pykeyboard/main/docs/source/images/row_reply_button.png" alt="row_reply_button"></p>
+<p><img src="https://raw.githubusercontent.com/johnnie-610/kurigram-addons/main/docs/public/row_reply_button.png" alt="row_reply_button"></p>
 
 </details>
-
 
 <details>
 <summary><b>Pyrogram Patch</b> (click to expand)</summary>
@@ -418,7 +418,7 @@ from pyrogram_patch.middlewares import BaseMiddleware
 class AuthMiddleware(BaseMiddleware):
     def __init__(self, allowed_users: list):
         self.allowed_users = allowed_users
-        
+
     async def __call__(self, update, client, patch_helper):
         if update.from_user.id not in self.allowed_users:
             await update.reply("Access denied!")
@@ -469,21 +469,21 @@ from pyrogram_patch.fsm.states import StateData
 class CustomStorage(BaseStorage):
     def __init__(self, connection_string: str):
         self.connection = self._connect(connection_string)
-    
+
     async def get_state(self, key: str) -> Optional[StateData]:
         data = await self.connection.get(f"state:{key}")
         return StateData(**data) if data else None
-    
+
     async def set_state(self, key: str, state_data: StateData) -> None:
         await self.connection.set(
             f"state:{key}",
             state_data.dict(),
             ex=state_data.ttl or 86400  # Default 24h TTL
         )
-    
+
     async def delete_state(self, key: str) -> None:
         await self.connection.delete(f"state:{key}")
-    
+
     async def _cleanup(self) -> None:
         """Optional: Clean up expired states"""
         pass
@@ -514,4 +514,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 🥳 Have fun with pyrogram_patch! 🎉
 
 </details>
-

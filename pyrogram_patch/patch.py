@@ -1,136 +1,278 @@
-from typing import Any, Type, TypeVar, Optional, TYPE_CHECKING
-from pyrogram import Client
-from pyrogram.handlers.handler import Handler
+# SPDX-License-Identifier: MIT
+#
+# This file is part of the kurigram-addons library
+#
+# Copyright (c) 2025-2026 Johnnie
+#
+# For the full copyright and license information, please view the LICENSE
+# file that was distributed with this source code
 
-from .dispatcher import PatchedDispatcher
-from .router import Router
-from .patch_data_pool import PatchDataPool, global_pool
+
+import logging
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
+
+from pyrogram import Client
+
+from pyrogram_patch import errors
+from pyrogram_patch.dispatcher import PatchedDispatcher
+from pyrogram_patch.fsm.base_storage import BaseStorage
+from pyrogram_patch.patch_data_pool import PatchDataPool, initialize_global_pool
+from pyrogram_patch.router import Router
 
 if TYPE_CHECKING:
-    from .fsm.base_storage import BaseStorage
+    from .middlewares.middleware_manager import MiddlewareManager
 
-# Type variable for middleware type
-MiddlewareT = TypeVar('MiddlewareT', bound=Any)  # More specific type could be used
+    MiddlewareT = TypeVar("MiddlewareT", bound=Callable)
+else:
+    MiddlewareT = TypeVar("MiddlewareT", bound=Any)
+
+logger = logging.getLogger("pyrogram_patch.patch")
+
 
 class PatchManager:
-    """Manages patching of Pyrogram client and middleware registration.
-    
-    This class provides an interface to:
-    - Apply patches to the Pyrogram client
-    - Register middlewares for request/response processing
-    - Configure state management storage
-    - Include routers for organized handler registration
-    """
-    
-    def __init__(self, client: Client) -> None:
-        """Initialize the PatchManager.
-        
-        Args:
-            client: The Pyrogram client instance to patch
-        """
-        self.client = client
-        self.dispatcher: PatchedDispatcher = client.dispatcher
-        
-    def include_middleware(self, middleware: MiddlewareT) -> None:
-        """Register a middleware to process updates before handlers.
-        
-        Args:
-            middleware: The middleware instance to register
-        """
-        # Use the global pool instance to add middleware
-        with global_pool._lock:
-            global_pool._middlewares.append(middleware)
-        
-    def include_outer_middleware(self, middleware: MiddlewareT) -> None:
-        """Register an outer middleware that runs before regular middlewares.
-        
-        Args:
-            middleware: The middleware instance to register
-        """
-        # Use the global pool instance to add outer middleware
-        with global_pool._lock:
-            global_pool._outer_middlewares.append(middleware)
-        
-    def set_storage(self, storage: 'BaseStorage') -> None:
-        """Set the storage backend for FSM (Finite State Machine).
-        
-        Args:
-            storage: The storage implementation to use
-        """
-        # Use the global pool instance to set FSM storage
-        with global_pool._lock:
-            global_pool._fsm_storage = storage
-        
-    def include_router(self, router: Router) -> None:
-        """Register a router with the client.
-        
-        Args:
-            router: The router instance to register
-        """
-        router.set_client(self.client)
-        
-    def __repr__(self) -> str:
-        """Return a string representation of the PatchManager."""
-        return f"<PatchManager client={self.client!r}>"
+    """Manages patching of Pyrogram client with integrated pool and managers.
 
+    This class provides an async interface to initialize the patch system,
+    register middlewares via the pool manager, configure FSM storage, and
+    include routers with validation.
 
-def patch(app: Client) -> PatchManager:
-    """Apply patches to a Pyrogram client.
-    
-    This function:
-    1. Replaces the default dispatcher with a patched version
-    2. Returns a PatchManager instance for further configuration
-    
-    Args:
-        app: The Pyrogram client instance to patch
-        
-    Returns:
-        PatchManager: An instance for configuring patches
-        
     Example:
+        >>> import asyncio
         >>> from pyrogram import Client
         >>> from pyrogram_patch import patch
-        >>> 
-        >>> app = Client("my_account")
-        >>> patch_manager = patch(app)
-        >>> # Configure patches...
+        >>> from pyrogram_patch.fsm.storages.memory_storage import MemoryStorage
+        >>>
+        >>> async def main():
+        ...     app = Client("my_account")
+        ...     manager = await patch(app)
+        ...     storage = MemoryStorage()
+        ...     await manager.set_storage(storage)
+        ...     router = Router()
+        ...     manager.include_router(router)
+        ...     await app.start()
+    """
+
+    def __init__(self, client: Client, pool: PatchDataPool) -> None:
+        """Initialize the PatchManager with client and pool.
+
+        Args:
+            client: The Pyrogram client instance.
+            pool: The initialized PatchDataPool instance.
+
+        Raises:
+            PatchError: If client or pool is invalid.
+        """
+        if not isinstance(client, Client):
+            raise errors.PatchError("Invalid client type")
+        if not isinstance(pool, PatchDataPool):
+            raise errors.PatchError("Invalid pool instance")
+
+        self.client = client
+        self.dispatcher: PatchedDispatcher = client.dispatcher
+        self._pool = pool
+
+    async def include_middleware(
+        self, middleware: MiddlewareT, kind: str = "before", priority: int = 0
+    ) -> str:
+        """Register middleware via the pool manager.
+
+        Args:
+            middleware: The middleware callable.
+            kind: Middleware type ('before', 'after', 'around').
+            priority: Execution priority (higher first).
+
+        Returns:
+            str: The middleware ID.
+
+        Raises:
+            MiddlewareError: If middleware is invalid or kind unsupported.
+            PatchError: If pool access fails.
+        """
+        try:
+            return await self._pool.add_middleware(
+                middleware, kind=kind, priority=priority
+            )
+        except Exception as e:
+            raise errors.MiddlewareError(
+                "Failed to register middleware", cause=e
+            ) from e
+
+    # Deprecated: outer middlewares replaced by priority system
+    async def include_outer_middleware(
+        self, middleware: MiddlewareT, priority: int = 100
+    ) -> str:
+        """Register high-priority 'before' middleware (deprecated).
+
+        Args:
+            middleware: The middleware callable.
+            priority: High priority value (default: 100).
+
+        Returns:
+            str: The middleware ID.
+
+        Note:
+            This method is deprecated. Use include_middleware(kind='before', priority=100) instead.
+        """
+        import warnings
+
+        warnings.warn(
+            "include_outer_middleware is deprecated; use include_middleware(kind='before', priority=100) instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return await self.include_middleware(
+            middleware, kind="before", priority=priority
+        )
+
+    async def set_storage(self, storage: BaseStorage) -> None:
+        """Set the FSM storage backend via the pool.
+
+        Args:
+            storage: The BaseStorage implementation.
+
+        Raises:
+            ValidationError: If storage is not a BaseStorage subclass.
+            PatchError: If pool storage setting fails.
+        """
+        try:
+            self._pool.set_fsm_storage(storage)
+        except Exception as e:
+            raise errors.PatchError("Failed to set FSM storage", cause=e) from e
+
+    def include_router(self, router: Router) -> None:
+        """Register and validate a router with the client.
+
+        Args:
+            router: The Router instance to register.
+
+        Raises:
+            ValidationError: If router is not a Router instance.
+            PatchError: If router already registered or client setting fails.
+        """
+        if not isinstance(router, Router):
+            raise errors.ValidationError(
+                field="router", value=type(router).__name__, expected="Router"
+            )
+
+        # Initialize routers list if it doesn't exist
+        if not hasattr(self.client, "routers"):
+            self.client.routers = []
+
+        # Check if this router is already registered
+        if router in self.client.routers:
+            raise errors.PatchError("Router already registered")
+
+        try:
+            router.set_client(self.client)
+            self.client.routers.append(router)
+        except Exception as e:
+            raise errors.PatchError("Failed to register router", cause=e) from e
+
+    async def unpatch(self) -> None:
+        """Unpatch the client and clean up resources."""
+        await unpatch(self.client)
+
+    async def __aenter__(self) -> "PatchManager":
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.unpatch()
+
+    def __repr__(self) -> str:
+        """String representation of PatchManager."""
+        return f"<PatchManager client={self.client!r} pool={self._pool!r}>"
+
+
+async def patch(app: Client) -> PatchManager:
+    """Async apply patches to a Pyrogram client and initialize pool.
+
+    This function:
+    1. Replaces the default dispatcher with PatchedDispatcher
+    2. Initializes the global PatchDataPool asynchronously
+    3. Returns a PatchManager for configuration
+
+    Args:
+        app: The Pyrogram Client instance to patch.
+
+    Returns:
+        PatchManager: Configured manager instance.
+
+    Raises:
+        TypeError: If app is not a Client.
+        PatchError: If client already patched or initialization fails.
+
+    Example:
+        >>> import asyncio
+        >>> from pyrogram import Client
+        >>> from pyrogram_patch import patch
+        >>>
+        >>> async def main():
+        ...     app = Client("my_account")
+        ...     manager = await patch(app)
+        ...     # Now configure: await manager.set_storage(storage)
+        ...     await app.start()
+        >>> asyncio.run(main())
     """
     if not isinstance(app, Client):
         raise TypeError(f"Expected Client instance, got {type(app).__name__}")
+
+    if getattr(app, "_patched", False):
+        raise errors.PatchError("This client has already been patched")
+
+    try:
+        # Initialize pool first
+        pool = await initialize_global_pool(app)
+
+        # Replace dispatcher
+        original_dispatcher = app.dispatcher
+        patched_dispatcher = PatchedDispatcher(app)
         
-    if hasattr(app, '_patched'):
-        raise RuntimeError("This client has already been patched")
+        # Migrate existing handlers and parsers from original dispatcher
+        # This ensures that handlers registered via global decorators BEFORE patch()
+        # are preserved and correctly handled by the new dispatcher.
+        if original_dispatcher:
+            patched_dispatcher.groups = original_dispatcher.groups
+            patched_dispatcher.update_parsers = original_dispatcher.update_parsers
         
-    # Replace the default dispatcher
-    original_dispatcher = app.dispatcher
-    app.dispatcher = PatchedDispatcher(app)
-    
-    # Store reference to original dispatcher for potential unpatching
-    app._original_dispatcher = original_dispatcher
-    app._patched = True
-    
-    return PatchManager(app)
+        app.dispatcher = patched_dispatcher
+        app.dispatcher.patch_data_pool = pool
+        app._original_dispatcher = original_dispatcher
+        app._patched = True
+        app._pool = pool  # Store reference
+
+        return PatchManager(app, pool)
+    except Exception as e:
+        raise errors.PatchError("Patch initialization failed", cause=e) from e
 
 
-def unpatch(app: Client) -> None:
-    """Revert patches applied to a Pyrogram client.
-    
+async def unpatch(app: Client) -> None:
+    """Async revert patches and clean up pool/resources.
+
     Args:
-        app: The Pyrogram client to un-patch
-        
+        app: The Pyrogram Client to unpatch.
+
     Raises:
-        RuntimeError: If the client hasn't been patched
-        AttributeError: If the original dispatcher is missing
+        RuntimeError: If client not patched.
+        PatchError: If cleanup fails (original dispatcher missing or pool issues).
     """
-    if not getattr(app, '_patched', False):
+    if not getattr(app, "_patched", False):
         raise RuntimeError("This client has not been patched")
-        
-    if not hasattr(app, '_original_dispatcher'):
-        raise AttributeError("Original dispatcher not found")
-        
-    # Restore the original dispatcher
-    app.dispatcher = app._original_dispatcher
-    
-    # Clean up
-    del app._original_dispatcher
-    del app._patched
+
+    if not hasattr(app, "_original_dispatcher"):
+        raise errors.PatchError("Original dispatcher not found for cleanup")
+
+    try:
+        # Restore dispatcher
+        app.dispatcher = app._original_dispatcher
+
+        # Clean pool if accessible
+        if hasattr(app, "_pool") and app._pool:
+            await app._pool.clear_all()
+
+        # Final cleanup
+        del app._original_dispatcher
+        del app._patched
+        if hasattr(app, "_pool"):
+            del app._pool
+    except Exception as e:
+        raise errors.PatchError("Unpatch cleanup failed", cause=e) from e
