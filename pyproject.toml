@@ -1,13 +1,11 @@
 [project]
 name = "kurigram-addons"
-version = "0.3.0"
+version = "0.3.1"
 description = "A collection of useful addons for the Kurigram library"
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 license = "MIT"
-authors = [
-    { name = "Johnnie", email = "johnnie610@duck.com" }
-]
+authors = [{ name = "Johnnie", email = "johnnie610@duck.com" }]
 keywords = ["kurigram", "addons", "pykeyboard", "pyrogram-patch"]
 
 # Poetry 2.0 uses this standard PEP 621 field for dependencies
@@ -32,10 +30,7 @@ build-backend = "poetry.core.masonry.api"
 # Tool Specific Configurations
 
 [tool.poetry]
-packages = [
-    { include = "pykeyboard" },
-    { include = "pyrogram_patch" },
-]
+packages = [{ include = "pykeyboard" }, { include = "pyrogram_patch" }]
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.2.0"
@@ -59,7 +54,7 @@ python_functions = ["test_*", "*test_*"]
 python_classes = ["Test*", "*Test*"]
 # 'asyncio_mode' is deprecated as a standalone key in newer pytest-asyncio; 
 # passing it via addopts is safer.
-addopts = "-v -s --asyncio-mode=auto" 
+addopts = "-v -s --asyncio-mode=auto"
 
 [tool.ruff]
 line-length = 80

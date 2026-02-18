@@ -7,22 +7,24 @@
 
 # Installation
 
-> PLEASE DON'T USE THE PYPI VERSION OF THIS LIBRARY. IT'S OUTDATED.
+The easiest way to install the library is via PyPI:
 
 ## using pip
 
 ```bash
-#bash
-pip install git+https://github.com/johnnie-610/kurigram-addons.git
-
+pip install kurigram-addons
 ```
 
 ## using poetry
 
 ```bash
-# bash
-poetry add git+https://github.com/johnnie-610/kurigram-addons.git
+poetry add kurigram-addons
+```
 
+## install from source (development)
+
+```bash
+pip install git+https://github.com/johnnie-610/kurigram-addons.git
 ```
 
 # Usage
