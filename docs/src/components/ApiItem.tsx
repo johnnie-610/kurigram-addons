@@ -1,6 +1,5 @@
 import { Component, For, Show } from "solid-js";
-
-interface Parameter {
+import CodeBlock from "~/components/CodeBlock";interface Parameter {
   name: string;
   type: string;
   description: string;
@@ -24,6 +23,8 @@ interface ApiItemProps {
   };
   raises?: Exception[];
   note?: string;
+  example?: string;
+  exampleLanguage?: string;
 }
 
 const ApiItem: Component<ApiItemProps> = (props) => {
@@ -121,6 +122,21 @@ const ApiItem: Component<ApiItemProps> = (props) => {
                             </div>
                         )}
                     </For>
+                </div>
+            </div>
+        </Show>
+
+        {/* Example */}
+        <Show when={props.example}>
+            <div class="space-y-4">
+                 <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Example
+                </h4>
+                <div class="-my-4">
+                    <CodeBlock 
+                        language={props.exampleLanguage || "python"}
+                        code={props.example!}
+                    />
                 </div>
             </div>
         </Show>

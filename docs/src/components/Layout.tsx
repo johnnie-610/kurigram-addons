@@ -1,6 +1,7 @@
 import { Component, createSignal, JSX } from "solid-js";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
+import TableOfContents from "./TableOfContents";
 
 interface LayoutProps {
   children: JSX.Element;
@@ -22,10 +23,11 @@ const Layout: Component<LayoutProps> = (props) => {
           closeMobileMenu={() => setIsSidebarOpen(false)}
         />
 
-        <main class="flex-1 w-full overflow-y-auto p-4 sm:p-6 lg:p-12 relative">
-          <div class="max-w-4xl mx-auto prose prose-slate dark:prose-invert prose-headings:text-slate-900 dark:prose-headings:text-white prose-h1:text-gradient-primary prose-a:text-primary-600 dark:prose-a:text-primary-400 prose-code:text-primary-600 dark:prose-code:text-primary-400 prose-pre:glass-card prose-pre:premium-shadow transition-all duration-300">
+        <main class="flex-1 w-full overflow-y-auto p-4 sm:p-6 lg:p-12 relative flex lg:flex-row flex-col gap-8">
+          <div class="w-full max-w-3xl xl:max-w-4xl prose prose-slate dark:prose-invert prose-headings:text-slate-900 dark:prose-headings:text-white prose-h1:text-gradient-primary prose-a:text-primary-600 dark:prose-a:text-primary-400 prose-code:text-primary-600 dark:prose-code:text-primary-400 prose-pre:glass-card prose-pre:premium-shadow transition-all duration-300">
             {props.children}
           </div>
+          <TableOfContents />
         </main>
       </div>
 

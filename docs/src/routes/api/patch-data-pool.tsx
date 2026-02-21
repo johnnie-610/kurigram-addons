@@ -31,12 +31,14 @@ export default function PatchDataPoolApi() {
           { name: "chat_id", type: "int", description: "Unique Telegram chat ID.", required: true }
         ]}
         returns={{ type: "FSMContext", description: "The scoped context object." }}
+        example={`context = pool.get_fsm_context(user_id=12345, chat_id=12345)\nawait context.set_state(MyStates.first_step)`}
       />
 
       <ApiItem 
         name="clear_all"
         signature="async clear_all()"
         description="Removes all stored data and registered middlewares from the pool. Use for full system resets."
+        example={`await pool.clear_all()\n# Everything is wiped clean`}
       />
 
       <ApiItem 
@@ -46,6 +48,7 @@ export default function PatchDataPoolApi() {
         parameters={[
             { name: "storage", type: "BaseStorage", description: "An implementation of the BaseStorage class." }
         ]}
+        example={`pool.set_fsm_storage(RedisStorage("redis://localhost:6379"))`}
       />
 
       {/* Footer Navigation */}

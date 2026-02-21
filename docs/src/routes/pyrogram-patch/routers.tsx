@@ -1,141 +1,105 @@
 import { Title } from "@solidjs/meta";
 import CodeBlock from "~/components/CodeBlock";
-import { 
-  Terminal, 
-  Workflow, 
-  Settings, 
-  ArrowRight,
-  ShieldCheck,
-  LayoutGrid,
-  Box
-} from "lucide-solid";
 import { A } from "@solidjs/router";
+import Callout from "~/components/Callout";
 
 export default function PatchRoutersPage() {
   return (
-    <div class="space-y-16 pb-20">
+    <div class="pb-20">
       <Title>Modular Routing Deep Dive - Pyrogram Patch</Title>
 
-      {/* Header */}
-      <section class="space-y-4 text-left">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold tracking-widest uppercase">
-          <Terminal size={12} /> Organizational Strategy
-        </div>
-        <h1 class="text-6xl font-black tracking-tighter">
-          Hierarchical Routers
-        </h1>
-        <p class="text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl font-medium">
-          Scale your bot logic horizontally. Our router system allows you to build trees of handlers with isolated logic, shared clients, and automated duplicate prevention.
-        </p>
-      </section>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold tracking-widest uppercase mb-4 not-prose">
+        Organizational Strategy
+      </div>
+      
+      <h1>Hierarchical Routers</h1>
+      
+      <p class="lead text-xl">
+        Scale your bot logic horizontally. Our router system allows you to build trees of handlers with isolated logic, shared clients, and automated duplicate prevention.
+      </p>
 
-      {/* Core Logic Grid */}
-      <section class="grid lg:grid-cols-2 gap-8">
-          <div class="p-10 rounded-[2.5rem] bg-slate-900/5 dark:bg-slate-500/5 border border-slate-200 dark:border-tokio-border space-y-6">
-              <div class="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                  <LayoutGrid size={24} />
-              </div>
-              <h3 class="text-2xl font-black">Deferred Registration</h3>
-              <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed font-medium">
-                Handlers registered on a <code>Router</code> are stored in a pending state until the router is attached to a <code>Client</code>. This allows you to define complex logic trees before your bot even starts.
-              </p>
-          </div>
-          <div class="p-10 rounded-[2.5rem] bg-slate-900/5 dark:bg-slate-500/5 border border-slate-200 dark:border-tokio-border space-y-6">
-              <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                  <ShieldCheck size={24} />
-              </div>
-              <h3 class="text-2xl font-black">Duplicate Defense</h3>
-              <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed font-medium">
-                The router system prevents the same handler from being registered twice to the same group, protecting your bot from duplicate update processing.
-              </p>
-          </div>
-      </section>
+      <h2>The Need for Routers</h2>
+      <p>
+        In a standard Pyrogram application, developers usually define all handlers in a single large file, or pass the <code>app</code> instance around to different files to register decorators. This quickly becomes impossible to maintain when your bot grows beyond a few dozen handlers.
+      </p>
+      
+      <p>
+        Routers solve this by allowing you to register handlers on a "dummy" object that is completely decoupled from your Telegram Client.
+      </p>
 
-      {/* Implementation Pattern */}
-      <section class="space-y-8">
-        <h2 class="text-3xl font-black tracking-tight flex items-center gap-3">
-          <Settings class="text-slate-400" /> Building the Tree
-        </h2>
-        <p class="text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
-          The best practice is to separate your feature areas into dedicated files, each with its own router, and then include them into a single root router.
-        </p>
+      <h3>Deferred Registration</h3>
+      <p>
+        Handlers registered on a <code>Router</code> are stored in a pending state until the router is eventually attached to the <code>PatchManager</code>. This allows you to define complex logic trees before your bot even starts, and easily unit test them.
+      </p>
 
-        <div class="space-y-12">
-            <div class="space-y-4">
-                <h3 class="text-xl font-bold italic text-blue-500">1. Define Feature Router</h3>
-                <CodeBlock
-                    language="python"
-                    filename="features/auth.py"
-                    code={`from pyrogram_patch.router import Router
+      <h3>Duplicate Defense</h3>
+      <p>
+        The router system actively prevents the same handler function from being registered twice to the same Pyrogram group. It protects your bot from terrifying duplicate update bugs when team members accidentally import the same module twice.
+      </p>
 
+      <h2>Building the Tree</h2>
+      <p>
+        The best practice is to separate your feature areas into dedicated files, each with its own router, and then include them into a central root router.
+      </p>
+
+      <h3>1. Define the Feature Router</h3>
+      <p>Create a router for a specific domain, like authentication or payments.</p>
+      <CodeBlock
+          language="python"
+          filename="features/auth.py"
+          code={`from pyrogram import filters
+from pyrogram_patch.router import Router
+
+# Create an isolated router
 auth_router = Router()
 
 @auth_router.on_message(filters.command("login"))
 async def login_handler(client, message):
     await message.reply("Logging you in...")`}
-                />
-            </div>
+      />
 
-            <div class="space-y-4">
-                <h3 class="text-xl font-bold italic text-blue-500">2. Assemble the Tree</h3>
-                <CodeBlock
-                    language="python"
-                    filename="main.py"
-                    code={`from .features.auth import auth_router
+      <h3>2. Assemble the Tree</h3>
+      <p>In your main execution file, combine all your feature routers into a single root router, or attach them directly to the patch manager.</p>
+      <CodeBlock
+          language="python"
+          filename="main.py"
+          code={`from pyrogram import Client
+from pyrogram_patch import patch
 from pyrogram_patch.router import Router
 
-main_router = Router()
+# Import your features
+from .features.auth import auth_router
+from .features.payments import payments_router
 
-# Nested routing
-main_router.include_router(auth_router)
+async def run_bot():
+    app = Client("modular_bot")
+    manager = await patch(app)
+    
+    # You can nest routers as deeply as you want
+    main_router = Router()
+    main_router.include_router(auth_router)
+    main_router.include_router(payments_router)
+    
+    # Finally, attach the root to the engine
+    manager.include_router(main_router)
+    
+    await app.start()
+    await app.idle()`}
+      />
 
-# Attached to manager later
-patch_manager.include_router(main_router)`}
-                />
-            </div>
-        </div>
-      </section>
+      <h2>Advanced Pattern: Router Context</h2>
+      <p>
+        Because routers define isolated boundaries, you might want to share specific dependencies (like a database connection) only with handlers inside a specific router, rather than globally via middlewares.
+      </p>
+      <p>This is currently achieved by applying Middlewares directly to specific Routers, ensuring that dependency injection only triggers for relevant handler groups.</p>
 
-      {/* Advanced Features */}
-      <section class="space-y-8 p-10 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-tokio-border">
-          <h3 class="text-xl font-black flex items-center gap-3 italic">
-              <Box size={20} class="text-primary-500" /> Why use Routers?
-          </h3>
-          <div class="grid md:grid-cols-2 gap-8 text-sm">
-              <ul class="space-y-4">
-                  <li class="flex items-start gap-3">
-                      <div class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-1.5 shrink-0" />
-                      <span class="text-slate-500 font-medium">Clean project structure without "God files".</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                      <div class="w-1.5 h-1.5 rounded-full bg-primary-500 mt-1.5 shrink-0" />
-                      <span class="text-slate-500 font-medium">Independent testing of feature modules.</span>
-                  </li>
-              </ul>
-              <ul class="space-y-4">
-                  <li class="flex items-start gap-3">
-                      <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                      <span class="text-slate-500 font-medium">Easy sharing of common filters and logic.</span>
-                  </li>
-                  <li class="flex items-start gap-3">
-                      <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                      <span class="text-slate-500 font-medium">Performance optimization via pre-grouped handlers.</span>
-                  </li>
-              </ul>
-          </div>
-      </section>
+      <br />
+      <hr />
+      
+      <Callout type="info" title="The Next Step">
+         Combine routers with state management to build complex, persistent user flows that span across multiple files cleanly. Check out the <A class="font-bold" href="/pyrogram-patch/fsm">FSM Engine</A> docs.
+      </Callout>
 
-      {/* Footer Navigation */}
-      <section class="flex flex-col items-center gap-6 py-20 bg-slate-900/5 dark:bg-slate-500/5 rounded-[2.5rem]">
-        <h2 class="text-3xl font-black">The Final Piece: FSM</h2>
-        <p class="text-slate-500 font-medium max-w-lg text-center">Combine routers with state management to build complex, persistent user flows.</p>
-        <A 
-          href="/pyrogram-patch/fsm" 
-          class="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 shadow-xl shadow-indigo-500/20 transition-all flex items-center gap-2"
-        >
-          Master FSM Integration <ArrowRight size={20} />
-        </A>
-      </section>
     </div>
   );
 }

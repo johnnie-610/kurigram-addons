@@ -38,6 +38,7 @@ export default function ReplyKeyboardApi() {
         raises={[
             { name: "ConfigurationError", description: "Raised if row_width is less than 1." }
         ]}
+        example={`from pykeyboard import ReplyKeyboard\n\nkb = ReplyKeyboard(\n    row_width=2,\n    resize_keyboard=True,\n    placeholder="Choose an option..."\n)`}
       />
 
       {/* Methods */}
@@ -48,6 +49,7 @@ export default function ReplyKeyboardApi() {
         parameters={[
             { name: "*buttons", type: "ReplyButton | str", description: "Button objects or raw string labels." }
         ]}
+        example={`from pykeyboard import ReplyButton\n\nkb.add(\n    "Settings", \n    "Help", \n    ReplyButton("Send Contact", request_contact=True)\n)`}
       />
 
       <ApiItem 
@@ -57,6 +59,7 @@ export default function ReplyKeyboardApi() {
         parameters={[
             { name: "*buttons", type: "ReplyButton", description: "Buttons for this row." }
         ]}
+        example={`kb.row("Full Width Main Menu")`}
       />
 
       {/* Related Utilities */}

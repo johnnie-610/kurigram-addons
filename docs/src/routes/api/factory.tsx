@@ -33,6 +33,7 @@ export default function KeyboardFactoryApi() {
           { name: "callback_pattern", type: "str", description: "Pattern containing '{action}' ('yes', 'no', or 'cancel').", default: "'confirm_{action}'" }
         ]}
         returns={{ type: "InlineKeyboard", description: "A populated inline keyboard instance." }}
+        example={`from pykeyboard import KeyboardFactory\n\nkb = KeyboardFactory.create_confirmation_keyboard(\n    yes_text="Delete", \n    no_text="Keep", \n    callback_pattern="del_item_{action}"\n)`}
       />
 
       <ApiItem 
@@ -45,6 +46,7 @@ export default function KeyboardFactoryApi() {
           { name: "columns", type: "int", description: "Buttons per row (row_width).", default: "2" }
         ]}
         returns={{ type: "InlineKeyboard", description: "A populated inline keyboard instance." }}
+        example={`menu = {\n    "Profile": "profile",\n    "Settings": "settings",\n    "Help": "help"\n}\nkb = KeyboardFactory.create_menu_keyboard(menu, columns=2)`}
       />
 
       <ApiItem 
@@ -56,6 +58,7 @@ export default function KeyboardFactoryApi() {
             { name: "callback_pattern", type: "str", description: "Pattern containing '{stars}'.", default: "'rate_{stars}'" }
         ]}
         returns={{ type: "InlineKeyboard", description: "A star-rating keyboard." }}
+        example={`kb = KeyboardFactory.create_rating_keyboard(\n    max_rating=5, \n    callback_pattern="feedback_{stars}"\n)`}
       />
 
       <ApiItem 
@@ -67,6 +70,7 @@ export default function KeyboardFactoryApi() {
             { name: "deep_copy", type: "bool", description: "Whether to perform a deep recursion copy of button objects.", default: "True" }
         ]}
         returns={{ type: "InlineKeyboard | ReplyKeyboard", description: "The cloned keyboard." }}
+        example={`new_kb = KeyboardFactory.clone_keyboard(existing_kb)\nnew_kb.add(InlineButton("Extra Option", "extra"))`}
       />
 
       {/* Navigation Footer */}

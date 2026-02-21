@@ -33,6 +33,7 @@ export default function PatchManagerApi() {
         raises={[
             { name: "PatchError", description: "Raised if the client is already patched or initialization fails." }
         ]}
+        example={`from pyrogram import Client\nfrom pyrogram_patch import patch\n\napp = Client("bot")\nmanager = await patch(app)`}
       />
 
       {/* Methods */}
@@ -46,6 +47,7 @@ export default function PatchManagerApi() {
           { name: "priority", type: "int", description: "Execution order (higher runs first).", default: "0" }
         ]}
         returns={{ type: "str", description: "A unique identifier for the registered middleware." }}
+        example={`async def db_middleware(update, patch_helper):\n    await patch_helper.update_data(db="connected")\n\nawait manager.include_middleware(db_middleware, kind="before", priority=100)`}
       />
 
       <ApiItem 
@@ -55,6 +57,7 @@ export default function PatchManagerApi() {
         parameters={[
             { name: "router", type: "Router", description: "The router instance to include.", required: true }
         ]}
+        example={`from pyrogram_patch.router import Router\n\nmy_router = Router()\n\n# Attach module\nmanager.include_router(my_router)`}
       />
 
       <ApiItem 
@@ -64,12 +67,14 @@ export default function PatchManagerApi() {
         parameters={[
             { name: "storage", type: "BaseStorage", description: "A storage implementation (e.g. MemoryStorage, RedisStorage).", required: true }
         ]}
+        example={`from pyrogram_patch.fsm.storages import RedisStorage\n\nstorage = RedisStorage("redis://localhost:6379/0")\nawait manager.set_storage(storage)`}
       />
 
       <ApiItem 
         name="unpatch"
         signature="async unpatch()"
         description="Reverts the client to its original state, restoring the default dispatcher and clearing the pool."
+        example={`await manager.unpatch()\n# App returns to standard Pyrogram behavior`}
       />
 
       {/* Footer Navigation */}

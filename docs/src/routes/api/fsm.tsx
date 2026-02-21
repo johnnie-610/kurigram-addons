@@ -32,6 +32,7 @@ export default function FsmApi() {
           name="transitions"
           signature="transitions: Dict[State, List[State]]"
           description="A mapping of valid state transitions. If defined, the FSM will enforce these rules."
+          example={`from pyrogram_patch.fsm import StatesGroup, State\n\nclass CheckoutFlow(StatesGroup):\n    cart = State()\n    payment = State()\n    completed = State()\n\n    transitions = {\n        cart: [payment],\n        payment: [completed]\n    }`}
         />
 
         <Callout type="note">
@@ -55,6 +56,7 @@ export default function FsmApi() {
             { name: "ttl", type: "int", description: "Optional time-to-live in seconds for this state." }
           ]}
           raises={[{ name: "InvalidStateTransition", description: "Raised if transition validation fails." }]}
+          example={`await patch_helper.fsm.set_state(CheckoutFlow.payment)`}
         />
 
         <ApiItem 
@@ -62,6 +64,7 @@ export default function FsmApi() {
           signature="async get_state()"
           description="Retrieves the current state ID string."
           returns={{ type: "str | None", description: "Current state name or None." }}
+          example={`current = await patch_helper.fsm.get_state()\nif current == "CheckoutFlow:payment":\n    pass`}
         />
 
         <ApiItem 
@@ -71,30 +74,16 @@ export default function FsmApi() {
           parameters={[
               { name: "**kwargs", type: "Any", description: "Key-value pairs to store." }
           ]}
+          example={`await patch_helper.fsm.update_data(item_id=42, quantity=1)`}
         />
 
         <ApiItem 
           name="finish"
           signature="async finish()"
           description="Clears both state and data for the current context."
+          example={`await patch_helper.fsm.finish()`}
         />
       </section>
-
-      <div class="pt-10 border-t border-slate-200 dark:border-tokio-border">
-          <h2 class="text-3xl font-black mb-8 tracking-tight">Metadata Classes</h2>
-          
-          <ApiItem 
-            name="StatesGroup"
-            signature="class MyFlow(StatesGroup): ..."
-            description="Metaclass-driven container for State objects. Namespaces your states automatically."
-          />
-
-          <ApiItem 
-            name="State"
-            signature="state_name = State()"
-            description="Represents a unique point in your finite state machine."
-          />
-      </div>
 
       {/* Footer Navigation */}
       <section class="flex flex-col items-center gap-6 py-20 bg-slate-900/5 dark:bg-slate-500/5 rounded-[2.5rem]">

@@ -29,15 +29,17 @@ export default function RouterApi() {
         parameters={[
           { name: "router", type: "Router", description: "The sub-router to include.", required: true }
         ]}
+        example={`root_router = Router()\nauth_router = Router()\n\nroot_router.include_router(auth_router)`}
       />
 
       <ApiItem 
         name="set_client"
         signature="set_client(client)"
-        description="Assigns a Pyrogram client to the router and registers all pending handlers."
+        description="Assigns a Pyrogram client to the router and registers all pending handlers. Usually called internally by PatchManager."
         parameters={[
             { name: "client", type: "pyrogram.Client", description: "The target client for handler registration." }
         ]}
+        example={`router.set_client(app)`}
       />
 
       {/* Decorators */}
@@ -55,6 +57,18 @@ export default function RouterApi() {
                     <span class="text-primary-500 font-black">@router.{d}</span>(filters, group=0)
                 </div>
               ))}
+          </div>
+
+          <div class="mt-8">
+            <h4 class="text-[11px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2 mb-4">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Example Usage
+            </h4>
+            <div class="-my-4 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <CodeBlock 
+                    language="python"
+                    code={`from pyrogram import filters\nfrom pyrogram_patch.router import Router\n\nrouter = Router()\n\n@router.on_message(filters.command("start"))\nasync def start_cmd(client, message):\n    await message.reply("Hello!")\n\n@router.on_callback_query(filters.regex("prefix:"))\nasync def cq_handler(client, callback):\n    await callback.answer()`}
+                />
+            </div>
           </div>
       </section>
 

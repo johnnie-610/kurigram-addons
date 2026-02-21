@@ -1,226 +1,137 @@
 import { Title } from "@solidjs/meta";
 import CodeBlock from "~/components/CodeBlock";
 import Callout from "~/components/Callout";
-import { 
-  Box, 
-  Workflow, 
-  Database, 
-  ShieldCheck, 
-  Settings, 
-  ArrowRight,
-  Sparkles,
-  Cpu
-} from "lucide-solid";
-import { A } from "@solidjs/router";
 
 export default function PatchFsmPage() {
   return (
-    <div class="space-y-16 pb-20">
+    <div class="pb-20">
       <Title>FSM Engine Deep Dive - Pyrogram Patch</Title>
 
-      {/* Header */}
-      <section class="space-y-4">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-[10px] font-bold tracking-widest uppercase">
-          <Box size={12} /> State Management
-        </div>
-        <h1 class="text-6xl font-black tracking-tighter">
-          Finite State Machine
-        </h1>
-        <p class="text-xl text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl font-medium">
-          Manage complex, multi-step user interactions with context-aware state persistence. The FSM engine handles data isolation and automated dependency injection.
-        </p>
-      </section>
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-[10px] font-bold tracking-widest uppercase mb-4 not-prose">
+        State Management
+      </div>
+      
+      <h1>Finite State Machine</h1>
+      
+      <p class="lead text-xl">
+        Manage complex, multi-step user interactions with context-aware state persistence. The FSM engine handles data isolation and automated dependency injection natively.
+      </p>
 
-      <section class="mb-20">
-        <h2 class="text-3xl font-black mb-8 tracking-tight">FSM Engine</h2>
-        <p class="text-slate-700 dark:text-slate-300 font-medium leading-relaxed mb-6">
-          The FSM (Finite State Machine) engine manages user conversational states across multiple storage backends. 
-          It allows you to build complex multi-step interactions while preserving context safely and efficiently.
-        </p>
+      <h2>The FSM Architecture</h2>
+      <p>
+        A Finite State Machine restricts users so they can only trigger specific handlers if they are in a specific "state"—like answering a series of questions.
+      </p>
+      
+      <ul>
+        <li><strong>Isolation:</strong> States are strictly isolated per chat/user by default.</li>
+        <li><strong>Filters:</strong> Built-in decorators route handlers based in O(1) time complexity.</li>
+        <li><strong>Storage:</strong> Pluggable backends meaning you can use Memory in testing, and Redis in production without changing your logic.</li>
+      </ul>
 
-        <div class="grid md:grid-cols-3 gap-6 my-10">
-          <div class="glass-card p-6 rounded-2xl border-l-4 border-primary-500">
-            <h4 class="font-bold mb-2">Isolation</h4>
-            <p class="text-sm text-slate-500">States are strictly isolated per chat/user by default.</p>
-          </div>
-          <div class="glass-card p-6 rounded-2xl border-l-4 border-amber-500">
-            <h4 class="font-bold mb-2">Filters</h4>
-            <p class="text-sm text-slate-500">Built-in decorators to route handlers based on current state.</p>
-          </div>
-          <div class="glass-card p-6 rounded-2xl border-l-4 border-teal-500">
-            <h4 class="font-bold mb-2">Storage</h4>
-            <p class="text-sm text-slate-500">Pluggable backends: Memory, Redis, or your own custom storage.</p>
-          </div>
-        </div>
-      </section>
+      <h2>Defining the Machine</h2>
+      <p>
+        States are organized into <code>StatesGroup</code> classes to prevent typos and provide a clean, namespaced way to manage related states. Using raw strings for states is highly discouraged.
+      </p>
 
-      <section class="mb-20">
-        <h2 class="text-3xl font-black mb-6 tracking-tight">State Storage</h2>
-        <p class="text-slate-700 dark:text-slate-300 font-medium leading-relaxed mb-6">
-          Pyrogram Patch supports various storage backends for persisting state.
-        </p>
-
-        <h3 class="text-xl font-bold mb-4 text-primary-500">Redis Storage (Pro)</h3>
-        <p class="text-slate-700 dark:text-slate-300 font-medium leading-relaxed mb-4">
-          For production applications, use <code>RedisStorage</code> to persist states across bot restarts and share state between multiple bot instances.
-        </p>
-        <CodeBlock 
+      <CodeBlock
           language="python"
-          code={`
-from pyrogram_patch.fsm.storages import RedisStorage
-
-# Traditional connection
-storage = RedisStorage(host="localhost", port=6379, db=0)
-
-# URI-based connection
-storage = RedisStorage("redis://localhost:6379/0")
-
-await patch_manager.set_storage(storage)
-          `}
-        />
-
-        <h3 class="text-xl font-bold mt-10 mb-4 text-primary-500">Memory Storage</h3>
-        <p class="text-slate-700 dark:text-slate-300 font-medium leading-relaxed mb-4">
-          Ideal for development and testing. Data is lost when the process terminates.
-        </p>
-        <CodeBlock 
-          language="python"
-          code={`
-from pyrogram_patch.fsm.storages import MemoryStorage
-
-storage = MemoryStorage()
-await patch_manager.set_storage(storage)
-          `}
-        />
-      </section>
-
-      <section class="mb-20">
-        <h2 class="text-3xl font-black mb-6 tracking-tight">State Guards (Transitions)</h2>
-        <p class="text-slate-700 dark:text-slate-300 font-medium leading-relaxed mb-6">
-          You can define valid transitions within your <code>StatesGroup</code> to prevent invalid state jumps. 
-          If a transition is attempted that isn't in the <code>transitions</code> map, an <code>InvalidStateTransition</code> error is raised.
-        </p>
-
-        <CodeBlock 
-          language="python"
-          filename="states.py"
-          code={`
-class Registration(StatesGroup):
-    name = State()
-    age = State()
-    confirm = State()
-
-    # Define valid transitions
-    transitions = {
-        name: [age],
-        age: [confirm, name],  # Can go back to name
-        confirm: []            # End state
-    }
-          `}
-        />
-        
-        <Callout type="warning" title="Enforcement">
-           Transition validation is only performed when passing <code>State</code> objects to <code>set_state()</code>. String-based state changes bypass this guard.
-        </Callout>
-      </section>
-
-      {/* Core Principles */}
-      <section class="grid lg:grid-cols-2 gap-8">
-          <div class="p-10 rounded-[2.5rem] bg-purple-500/5 border border-purple-500/10 space-y-6">
-              <div class="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-                  <Workflow size={24} />
-              </div>
-              <h3 class="text-2xl font-black">Context Isolation</h3>
-              <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed font-medium italic">
-                Every user-chat pair gets its own isolated <code>FSMContext</code>. This allows multiple users to follow the same registration wizard simultaneously without data leaks or state collisions.
-              </p>
-          </div>
-          <div class="p-10 rounded-[2.5rem] bg-indigo-500/5 border border-indigo-500/10 space-y-6">
-              <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                  <ShieldCheck size={24} />
-              </div>
-              <h3 class="text-2xl font-black">State-Aware Filters</h3>
-              <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed font-medium italic">
-                Register handlers that only execute when a user is in a specific state. Our filters are deeply integrated with the dispatcher for O(1) matching performance.
-              </p>
-          </div>
-      </section>
-
-      {/* Technical Implementation */}
-      <section class="space-y-8">
-        <h2 class="text-3xl font-black tracking-tight">Defining the Machine</h2>
-        <p class="text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
-            States are organized into <code>StatesGroup</code> classes. This provides a clean, namespaced way to manage related states.
-        </p>
-        <CodeBlock
-            language="python"
-            code={`from pyrogram_patch.fsm import StatesGroup, State
+          code={`from pyrogram_patch.fsm import StatesGroup, State
 
 class OrderPizza(StatesGroup):
     choosing_size = State()
     adding_toppings = State()
     confirming = State()`}
-        />
-      </section>
+      />
 
-      {/* Real-world Example: Storage */}
-      <section class="space-y-8">
-        <h2 class="text-3xl font-black tracking-tight flex items-center gap-3">
-          <Database class="text-slate-400" /> Storage Backends
-        </h2>
-        <div class="grid md:grid-cols-2 gap-6">
-            <div class="p-8 rounded-3xl bg-white dark:bg-tokio-bg border border-slate-200 dark:border-tokio-border group hover:border-primary-500 transition-colors">
-                <h4 class="font-bold flex items-center gap-2 mb-4 uppercase text-xs tracking-widest">
-                    <Cpu class="size-4 text-emerald-500" /> Memory Storage
-                </h4>
-                <p class="text-sm text-slate-500 leading-relaxed font-medium">
-                    Fastest performance, stored in RAM. Data is lost upon bot restart. Perfect for development and small non-critical flows.
-                </p>
-            </div>
-            <div class="p-8 rounded-3xl bg-white dark:bg-tokio-bg border border-slate-200 dark:border-tokio-border group hover:border-primary-500 transition-colors">
-                <h4 class="font-bold flex items-center gap-2 mb-4 uppercase text-xs tracking-widest">
-                    <Sparkles class="size-4 text-rose-500" /> Redis Storage
-                </h4>
-                <p class="text-sm text-slate-500 leading-relaxed font-medium">
-                    EnterpriseReady. High-performance persistent storage. Supports multiple bot instances sharing the same state pool.
-                </p>
-            </div>
-        </div>
-      </section>
+      <h3>State Guards (Transitions)</h3>
+      <p>
+        For strict flows, you can define valid transitions within your <code>StatesGroup</code> to prevent invalid state jumps (e.g., jumping straight from <code>choosing_size</code> to <code>confirming</code>). 
+      </p>
+      <p>
+        If a transition is attempted that isn't in the <code>transitions</code> map, an <code>InvalidStateTransition</code> error is raised.
+      </p>
 
-      {/* Handling Data */}
-      <section class="space-y-8">
-        <h2 class="text-3xl font-black tracking-tight">The FSMContext Object</h2>
-        <p class="text-slate-600 dark:text-slate-400 font-medium opacity-80 leading-relaxed mb-6">
-            The <code>FSMContext</code> is the primary interface for state interaction. It is automatically injected into handlers filtered by states.
-        </p>
-        <CodeBlock
-            language="python"
-            code={`@router.on_message(OrderPizza.choosing_size)
+      <CodeBlock 
+          language="python"
+          filename="states.py"
+          code={`class Registration(StatesGroup):
+    name = State()
+    age = State()
+    confirm = State()
+
+    # Define strict valid transitions
+    transitions = {
+        name: [age],
+        age: [confirm, name],  # User can proceed or go back
+        confirm: []            # End state, nowhere to go
+    }`}
+      />
+      
+      <Callout type="warning" title="Enforcement Rule">
+          Transition validation is only performed when passing typed <code>State</code> objects to <code>set_state()</code>. Using raw string names will bypass this guard.
+      </Callout>
+
+      <h2>Handling Data with FSMContext</h2>
+      <p>
+        The <code>FSMContext</code> is the primary interface for state interaction. Because the dispatcher tracks the user's state internally, it automatically injects this context object into any handler filtered by an FSM state.
+      </p>
+
+      <CodeBlock
+          language="python"
+          code={`@router.on_message(OrderPizza.choosing_size)
 async def set_size(client, message, state):
-    # 1. Update persistent data
+    # 1. Save data persistently to the user's isolated session
     await state.update_data(size=message.text)
     
-    # 2. Change state
+    # 2. Advance the state securely
     await state.set_state(OrderPizza.adding_toppings)
     
-    # 3. Access current data
+    # 3. Retrieve the current data payload
     data = await state.get_data()
-    print(f"User ordered: {data['size']}")`}
-        />
-      </section>
+    print(f"User is currently ordering: {data['size']}")`}
+      />
 
-      {/* Final Wrap-up */}
-      <section class="flex flex-col items-center gap-8 py-20 bg-slate-900/5 dark:bg-slate-500/5 rounded-[3rem]">
-        <h2 class="text-4xl font-black text-center italic uppercase tracking-tighter">Ready to Scale?</h2>
-        <p class="text-slate-500 font-medium max-w-xl text-center">Combine your FSM logic with modular routing to create complex, manageable bot architectures.</p>
-        <A 
-          href="/pyrogram-patch/routers" 
-          class="px-8 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-500 shadow-xl shadow-purple-500/20 transition-all flex items-center gap-2"
-        >
-          Master Modular Routing <ArrowRight size={18} />
-        </A>
-      </section>
+      <h2>Storage Backends</h2>
+      <p>
+        By default, the FSM engine uses <code>MemoryStorage</code>, but the <code>PatchManager</code> makes it trivial to swap this out for a centralized database.
+      </p>
+
+      <h3>Memory Storage (Development)</h3>
+      <p>Provides the fastest performance as everything acts directly on RAM. Data is lost upon bot restart. Perfect for development and small, non-critical flows.</p>
+      
+      <CodeBlock 
+          language="python"
+          code={`from pyrogram_patch.fsm.storages import MemoryStorage
+
+storage = MemoryStorage()
+await patch_manager.set_storage(storage)`}
+      />
+
+      <h3>Redis Storage (Production)</h3>
+      <p>
+        Enterprise-ready, high-performance persistent storage. Redis ensures that if your bot restarts or crashes, user conversations aren't interrupted. Furthermore, it supports multiple bot worker processes sharing the same exact state pool.
+      </p>
+
+      <CodeBlock 
+          language="python"
+          code={`from pyrogram_patch.fsm.storages import RedisStorage
+
+# Traditional dictionary connection
+storage = RedisStorage(host="localhost", port=6379, db=0)
+
+# URI-based connection
+storage = RedisStorage("redis://localhost:6379/0")
+
+await patch_manager.set_storage(storage)`}
+      />
+
+      <br />
+      <hr />
+
+      <Callout type="info" title="Integration Note">
+        Data serialization into Redis is handled seamlessly. However, ensure that any Python object you pass to <code>state.update_data()</code> can be easily dumped and loaded by <code>pickle</code> or <code>json</code>, as complex class instances might fail to serialize.
+      </Callout>
+
     </div>
   );
 }

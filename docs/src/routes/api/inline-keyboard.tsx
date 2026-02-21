@@ -2,6 +2,7 @@ import { Title } from "@solidjs/meta";
 import ApiItem from "~/components/ApiItem";
 import { MousePointer2, Info, ArrowRight } from "lucide-solid";
 import { A } from "@solidjs/router";
+import CodeBlock from "~/components/CodeBlock";
 
 export default function InlineKeyboardApi() {
   return (
@@ -33,6 +34,7 @@ export default function InlineKeyboardApi() {
           { name: "current_page", type: "int", description: "Initial active page.", default: "0" },
           { name: "custom_locales", type: "dict", description: "Custom locale overrides.", default: "None" }
         ]}
+        example={`from pykeyboard import InlineKeyboard\n\nkb = InlineKeyboard(row_width=2)`}
       />
 
       {/* Paginate */}
@@ -55,6 +57,7 @@ export default function InlineKeyboardApi() {
           { name: "PaginationUnchangedError", description: "Raised if the generated keyboard is identical to the current one for that source." }
         ]}
         note="This method is highly optimized and uses an internal hash cache to prevent redundant UI generation."
+        example={`kb = InlineKeyboard()\nkb.paginate(count_pages=10, current_page=3, callback_pattern="page:{number}")\n\nawait message.reply("Page 3", reply_markup=kb)`}
       />
 
       {/* Languages */}
@@ -70,6 +73,7 @@ export default function InlineKeyboardApi() {
         raises={[
             { name: "LocaleError", description: "Raised if an invalid or unsupported locale code is provided." }
         ]}
+        example={`kb = InlineKeyboard()\nkb.languages("set_lang:{locale}", ["en_US", "fr_FR", "es_ES"])`}
       />
 
       {/* Add */}
@@ -80,6 +84,7 @@ export default function InlineKeyboardApi() {
         parameters={[
             { name: "*buttons", type: "InlineButton | str", description: "Any number of button objects or raw text titles." }
         ]}
+        example={`from pykeyboard import InlineButton\n\nkb = InlineKeyboard(row_width=2)\nkb.add(InlineButton("Login", "login"), InlineButton("Help", "help"), InlineButton("Exit", "exit"))\n# "Exit" will wrap to a new row`}
       />
 
       {/* Row */}
@@ -90,6 +95,7 @@ export default function InlineKeyboardApi() {
         parameters={[
             { name: "*buttons", type: "InlineButton", description: "Buttons for this specific row." }
         ]}
+        example={`kb.row(InlineButton("Full Width Button", "full"))`}
       />
 
       {/* Custom Locales */}
@@ -101,6 +107,7 @@ export default function InlineKeyboardApi() {
             { name: "locale_code", type: "str", description: "Unique identifier (e.g. 'en_PIRATE')." },
             { name: "display_name", type: "str", description: "UTF-8 string with flag and name (e.g. '🏴‍☠️ Pirate')." }
         ]}
+        example={`InlineKeyboard.add_custom_locale("en_PIRATE", "🏴‍☠️ Pirate English")`}
       />
 
       {/* Static Methods */}
@@ -116,6 +123,7 @@ export default function InlineKeyboardApi() {
                 { name: "source", type: "str | None", description: "If provided, only clears hashes for this specific source." }
             ]}
             returns={{ type: "int", description: "Total number of hashes cleared." }}
+            example={`InlineKeyboard.clear_pagination_hashes()\n# Cache is wiped.`}
           />
       </div>
 

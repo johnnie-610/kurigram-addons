@@ -29,6 +29,7 @@ export default function KeyboardBuilderApi() {
         parameters={[
           { name: "keyboard", type: "InlineKeyboard | ReplyKeyboard", description: "The base keyboard instance to wrap.", required: true }
         ]}
+        example={`from pykeyboard import InlineKeyboard, KeyboardBuilder\n\nbase_kb = InlineKeyboard(row_width=2)\nbuilder = KeyboardBuilder(base_kb)`}
       />
 
       {/* Chainable Methods */}
@@ -42,6 +43,7 @@ export default function KeyboardBuilderApi() {
           { name: "**kwargs", type: "Any", description: "Additional parameters (url, web_app, etc.)." }
         ]}
         returns={{ type: "KeyboardBuilder", description: "Returns self for chaining." }}
+        example={`builder.add_button("Next", "page:2").add_button("Back", "page:0")`}
       />
 
       <ApiItem 
@@ -52,16 +54,18 @@ export default function KeyboardBuilderApi() {
           { name: "*buttons", type: "Any", description: "List of buttons to add.", required: true }
         ]}
         returns={{ type: "KeyboardBuilder", description: "Returns self for chaining." }}
+        example={`builder.add_buttons("Apple", "Banana", "Orange")`}
       />
 
       <ApiItem 
         name="add_row"
         signature="add_row(*buttons)"
-        description="Adds a complete row of buttons to the layout."
+        description="Adds a complete row of buttons to the layout, bypassing row_width."
         parameters={[
             { name: "*buttons", type: "Any", description: "Buttons for the new row." }
         ]}
         returns={{ type: "KeyboardBuilder", description: "Returns self for chaining." }}
+        example={`builder.add_row("Confirm", "Cancel")`}
       />
 
       <ApiItem 
@@ -74,6 +78,7 @@ export default function KeyboardBuilderApi() {
           { name: "callback_data", type: "str | None", description: "Callback data.", default: "None" }
         ]}
         returns={{ type: "KeyboardBuilder", description: "Returns self for chaining." }}
+        example={`is_admin = True\n\nbuilder.add_conditional_button(\n    condition=is_admin,\n    text="Admin Panel",\n    callback_data="admin"\n)`}
       />
 
       {/* Build */}
@@ -82,6 +87,7 @@ export default function KeyboardBuilderApi() {
         signature="build()"
         description="Finalizes the construction and returns the underlying keyboard instance."
         returns={{ type: "InlineKeyboard | ReplyKeyboard", description: "The constructed keyboard ready for use." }}
+        example={`kb = KeyboardBuilder(InlineKeyboard(row_width=1))\\\n    .add_button("Option 1", "opt:1")\\\n    .add_button("Option 2", "opt:2")\\\n    .build()\n\nawait message.reply("Choose:", reply_markup=kb)`}
       />
 
       {/* Navigation Footer */}

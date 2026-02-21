@@ -30,6 +30,7 @@ export default function MiddlewareManagerApi() {
           { name: "fn", type: "AsyncCallable", description: "Function(update, client, helper).", required: true },
           { name: "priority", type: "int", description: "Execution order.", default: "0" }
         ]}
+        example={`await mw_manager.add_before(my_auth_check, priority=50)`}
       />
 
       <ApiItem 
@@ -39,6 +40,7 @@ export default function MiddlewareManagerApi() {
         parameters={[
           { name: "fn", type: "AsyncCallable", description: "Function(handler, update, client, helper).", required: true }
         ]}
+        example={`async def my_wrapper(handler, update):\n    print("Before")\n    res = await handler()\n    print("After")\n    return res\n\nawait mw_manager.add_around(my_wrapper)`}
       />
 
       <ApiItem 
@@ -48,6 +50,7 @@ export default function MiddlewareManagerApi() {
         parameters={[
             { name: "event", type: "str", description: "Event name.", required: true }
         ]}
+        example={`await mw_manager.fire_event("startup", db_pool=pool)`}
       />
 
       {/* Footer Navigation */}
