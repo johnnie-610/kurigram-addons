@@ -9,11 +9,11 @@
 
 ---
 
-**`kurigram-addons`** is a professional collection of utilities designed to dramatically enhance the development, maintainability, and scalability of Telegram bots built with [Kurigram](https://github.com/kurigram/kurigram) or [Pyrogram](https://github.com/pyrogram/pyrogram).
+**`kurigram-addons`** is a professional collection of utilities designed to dramatically enhance the development, maintainability, and scalability of Telegram bots built with [Kurigram](https://pypi.org/project/kurigram/).
 
 It brings powerful features such as a fully-typed Finite State Machine (FSM), deep hierarchical routing, tri-phase execution middlewares, and an extreme-performance UI framework natively into your applications.
 
-> 📚 **[Visit the Official Documentation Portal for detailed guides and API references!](https://kurigram-addons.vercel.app)** _(Note: Host URL may vary, check repository links)_
+> 📚 **[Visit the Official Documentation Portal for detailed guides and API references!](https://johnnie-610.github.io/kurigram-addons/)** 
 
 ## 🌟 Key Features
 
@@ -116,14 +116,6 @@ async def show_menu(client, message):
     await message.reply("Main System Menu:", reply_markup=kb)
 ```
 
-## 📖 Extended Documentation
-
-To harness the full potential of `kurigram-addons`, we recommend reviewing our comprehensive guides:
-
-- **[Architecting with Routers](https://kurigram-addons.vercel.app/pyrogram-patch/routers)**
-- **[The Tri-Phase Middleware Pipeline](https://kurigram-addons.vercel.app/pyrogram-patch/middlewares)**
-- **[Mastering Pydantic Settings](https://kurigram-addons.vercel.app/pyrogram-patch/configuration)**
-- **[Keyboard Factory Cheatsheet](https://kurigram-addons.vercel.app/pykeyboard/inline)**
 
 ## 🤝 Contributing
 
