@@ -7,9 +7,11 @@ import "./app.css";
 import "prismjs/themes/prism-tomorrow.css";
 
 export default function App() {
+  const basePath = import.meta.env.PROD ? "/kurigram-addons" : "/";
+  
   return (
     <Router
-      base={import.meta.env.BASE_URL}
+      base={basePath}
       root={props => (
       <MetaProvider>
         <Title>Kurigram Addons</Title>
