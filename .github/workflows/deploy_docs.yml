@@ -40,6 +40,9 @@ jobs:
       - name: Add .nojekyll
         run: touch .output/public/.nojekyll
 
+      - name: Add 404 fallback
+        run: cp .output/public/index.html .output/public/404.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
