@@ -11,6 +11,7 @@ import {
   Terminal
 } from "lucide-solid";
 import CodeBlock from "~/components/CodeBlock";
+import { Dynamic } from "solid-js/web";
 
 export default function Home() {
   return (
@@ -128,7 +129,7 @@ async def welcome(client, message, patch_helper):
               ].map(f => (
                 <div class="flex gap-6 group">
                   <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-primary-500 transition-colors">
-                    <f.icon size={24} class="group-hover:text-white transition-colors" />
+                    <Dynamic component={f.icon} size={24} class="group-hover:text-white transition-colors" />
                   </div>
                   <div>
                     <h4 class="text-xl font-bold mb-1">{f.title}</h4>

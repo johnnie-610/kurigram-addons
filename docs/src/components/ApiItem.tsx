@@ -1,5 +1,7 @@
 import { Component, For, Show } from "solid-js";
-import CodeBlock from "~/components/CodeBlock";interface Parameter {
+import CodeBlock from "~/components/CodeBlock";
+
+interface Parameter {
   name: string;
   type: string;
   description: string;

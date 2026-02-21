@@ -2,6 +2,7 @@ import { Title } from "@solidjs/meta";
 import ApiItem from "~/components/ApiItem";
 import { Terminal, ArrowRight } from "lucide-solid";
 import { A } from "@solidjs/router";
+import CodeBlock from "~/components/CodeBlock";
 
 export default function RouterApi() {
   return (
