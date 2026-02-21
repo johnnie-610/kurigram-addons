@@ -3,7 +3,7 @@ import { defineConfig } from "@solidjs/start/config";
 export default defineConfig({
   server: {
     preset: "static",
-    baseURL: process.env.NODE_ENV === "production" ? "/kurigram-addons/" : "/",
+    baseURL: process.env.GITHUB_ACTIONS || process.env.NODE_ENV === "production" ? "/kurigram-addons/" : "/",
     prerender: {
       routes: [
         "/",
