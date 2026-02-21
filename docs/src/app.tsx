@@ -8,7 +8,9 @@ import "prismjs/themes/prism-tomorrow.css";
 
 export default function App() {
   return (
-    <Router root={props => (
+    <Router
+      base={import.meta.env.BASE_URL}
+      root={props => (
       <MetaProvider>
         <Title>Kurigram Addons</Title>
         <Layout>
