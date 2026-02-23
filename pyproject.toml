@@ -28,7 +28,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 packages = [{ include = "pykeyboard" }, { include = "pyrogram_patch" }]
 
-# Testing
+# testing
+[tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 pytest-asyncio = "^0.21.1"
 pytest-cov = "^4.1.0"
