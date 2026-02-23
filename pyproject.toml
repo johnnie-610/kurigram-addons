@@ -26,7 +26,11 @@ build-backend = "poetry.core.masonry.api"
 
 # Tool Specific Configurations
 [tool.poetry]
-packages = [{ include = "pykeyboard" }, { include = "pyrogram_patch" }]
+packages = [
+    { include = "kurigram" },
+    { include = "pykeyboard" },
+    { include = "pyrogram_patch" },
+]
 
 # testing
 [tool.poetry.group.dev.dependencies]

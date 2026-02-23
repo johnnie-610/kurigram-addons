@@ -15,7 +15,8 @@
 
 
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
+import re
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from pyrogram_patch.router.patched_decorators.decorators import \
     PatchedDecorators
@@ -102,6 +103,64 @@ class Router(PatchedDecorators):
         }
 
         logger.debug("Router initialized")
+
+    # ── Convenience decorators ──────────────────────────────────
+
+    def on_callback(
+        self, data: str, *, group: int = 0
+    ) -> Callable:
+        """Shorthand for ``on_callback_query`` with exact data match.
+
+        Args:
+            data: The exact ``callback_data`` string to match.
+            group: Handler group (default: 0).
+
+        Example::
+
+            @router.on_callback("profile")
+            async def show_profile(client, query):
+                await query.answer("Opening profile...")
+        """
+        from pyrogram import filters
+
+        pattern = f"^{re.escape(data)}$"
+
+        def decorator(fn: Callable) -> Callable:
+            self.on_callback_query(filters.regex(pattern), group=group)(fn)
+            return fn
+
+        return decorator
+
+    def on_command(
+        self,
+        command: str,
+        *,
+        prefixes: str = "/",
+        group: int = 0,
+    ) -> Callable:
+        """Shorthand for ``on_message`` with command filter.
+
+        Args:
+            command: The command name (without prefix).
+            prefixes: Command prefix(es) (default: ``/``).
+            group: Handler group (default: 0).
+
+        Example::
+
+            @router.on_command("start")
+            async def start(client, message):
+                await message.reply("Hello!")
+        """
+        from pyrogram import filters
+
+        def decorator(fn: Callable) -> Callable:
+            self.on_message(
+                filters.command(command, prefixes=prefixes),
+                group=group,
+            )(fn)
+            return fn
+
+        return decorator
 
     @property
     def client(self) -> Optional[Client]:
