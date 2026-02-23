@@ -97,7 +97,7 @@ from kurigram.flood_wait import FloodWaitHandler
 from kurigram.rate_limit import RateLimit
 
 # ── Version ─────────────────────────────────────────────────────
-__version__ = "0.4.0-dev"
+__version__ = "0.4.0"
 
 __all__ = [
     # Client
