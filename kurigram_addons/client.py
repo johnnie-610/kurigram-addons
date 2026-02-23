@@ -12,7 +12,7 @@ middleware, FSM, routing, and FloodWait handling built-in.
 
 Example::
 
-    from kurigram import KurigramClient, MemoryStorage, Router
+    from kurigram_addons import KurigramClient, MemoryStorage, Router
 
     router = Router()
 
@@ -231,7 +231,7 @@ class KurigramClient(Client):
 
             app.include_conversation(Registration)
         """
-        from kurigram.conversation import Conversation
+        from kurigram_addons.conversation import Conversation
 
         if not (
             isinstance(conversation_cls, type)
@@ -261,7 +261,7 @@ class KurigramClient(Client):
 
             app.include_menus(main_menu, settings_menu)
         """
-        from kurigram.menu import Menu
+        from kurigram_addons.menu import Menu
 
         router = self._ensure_default_router()
         for menu in menus:

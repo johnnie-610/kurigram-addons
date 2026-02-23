@@ -36,6 +36,20 @@ Classes:
 For more information, visit: https://github.com/johnnie-610/kurigram-addons
 """
 
+import os as _os
+import warnings as _warnings
+
+# Only warn when imported directly by user code, not by kurigram_addons
+_caller = _os.environ.get("_KURIGRAM_ADDONS_INTERNAL")
+if not _caller:
+    _warnings.warn(
+        "Importing from 'pykeyboard' is deprecated. "
+        "Use 'from kurigram_addons import ...' instead. "
+        "This shim will be removed in v1.0.0.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 from .inline_keyboard import InlineKeyboard, pagination_client_context
 from .keyboard_base import Button, InlineButton
 from .reply_keyboard import PyForceReply as ForceReply

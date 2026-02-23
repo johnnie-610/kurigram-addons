@@ -5,7 +5,7 @@
 #
 # This file is part of the kurigram-addons library
 
-"""kurigram — Unified namespace for kurigram-addons.
+"""kurigram_addons — Unified namespace for kurigram-addons.
 
 This is the recommended top-level import for all kurigram-addons
 functionality. It re-exports everything from ``pykeyboard`` and
@@ -13,7 +13,7 @@ functionality. It re-exports everything from ``pykeyboard`` and
 
 Example::
 
-    from kurigram import (
+    from kurigram_addons import (
         KurigramClient,
         InlineKeyboard,
         InlineButton,
@@ -22,14 +22,19 @@ Example::
     )
 """
 
+import os as _os
+
+# Suppress deprecation warnings from our own re-exports
+_os.environ["_KURIGRAM_ADDONS_INTERNAL"] = "1"
+
 # ── Client ──────────────────────────────────────────────────────
-from kurigram.client import KurigramClient
+from kurigram_addons.client import KurigramClient
 
 # ── Conversation handler ────────────────────────────────────────
-from kurigram.conversation import Conversation, ConversationContext, ConversationState
+from kurigram_addons.conversation import Conversation, ConversationContext, ConversationState
 
 # ── Menu system ─────────────────────────────────────────────────
-from kurigram.menu import Menu, MenuButton
+from kurigram_addons.menu import Menu, MenuButton
 
 # ── Keyboards (from pykeyboard) ────────────────────────────────
 from pykeyboard import (
@@ -91,10 +96,10 @@ from pyrogram_patch.errors import (
 )
 
 # ── Phase 3: DX Improvements ───────────────────────────────────
-from kurigram.command_parser import CommandParseError, parse_command
-from kurigram.depends import Depends, resolve_dependencies
-from kurigram.flood_wait import FloodWaitHandler
-from kurigram.rate_limit import RateLimit
+from kurigram_addons.command_parser import CommandParseError, parse_command
+from kurigram_addons.depends import Depends, resolve_dependencies
+from kurigram_addons.flood_wait import FloodWaitHandler
+from kurigram_addons.rate_limit import RateLimit
 
 # ── Version ─────────────────────────────────────────────────────
 __version__ = "0.4.0"

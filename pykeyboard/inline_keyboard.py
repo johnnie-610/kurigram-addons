@@ -224,6 +224,51 @@ class InlineKeyboard(KeyboardBase):
                 pyrogram_keyboard.append(pyrogram_row)
             self._pyrogram_markup.inline_keyboard = pyrogram_keyboard
 
+    def button(
+        self,
+        text: str,
+        *,
+        callback: str | None = None,
+        url: str | None = None,
+    ) -> "InlineKeyboard":
+        """Add a button with a short callback_data or URL.
+
+        This is a convenience method that pairs with Router.on_callback().
+        The callback value should match the data passed to
+        @router.on_callback("same_value").
+
+        Args:
+            text: Button display text.
+            callback: Callback data string (matched by Router.on_callback).
+            url: External URL to open.
+
+        Returns:
+            Self for chaining.
+
+        Example::
+
+            kb = InlineKeyboard(row_width=2)
+            kb.button("Profile", callback="profile")
+            kb.button("Settings", callback="settings")
+            kb.button("Docs", url="https://docs.example.com")
+
+            @router.on_callback("profile")
+            async def show_profile(client, query):
+                await query.answer("Profile!")
+        """
+        if callback and url:
+            raise ValueError("Specify either callback or url, not both")
+        if not callback and not url:
+            raise ValueError("One of callback or url is required")
+
+        if callback:
+            btn = InlineButton(text=text, callback_data=callback)
+        else:
+            btn = InlineButton(text=text, url=url)
+
+        self.add(btn)
+        return self
+
     @staticmethod
     @lru_cache(maxsize=512)
     def _create_button(text: str, callback_data: str) -> InlineButton:

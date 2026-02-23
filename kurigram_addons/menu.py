@@ -12,7 +12,7 @@ callback routing, and edit-in-place navigation.
 
 Example::
 
-    from kurigram import Menu
+    from kurigram_addons import Menu
 
     main_menu = Menu("main", text="Main Menu")
     main_menu.button("👤 Profile", goto="profile")

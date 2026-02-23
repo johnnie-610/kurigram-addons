@@ -12,7 +12,7 @@ and defining :class:`ConversationState` descriptors with hooks.
 
 Example::
 
-    from kurigram import Conversation, ConversationState
+    from kurigram_addons import Conversation, ConversationState
 
     class Registration(Conversation):
         name = ConversationState(initial=True)
@@ -58,7 +58,7 @@ Example::
 
 Usage::
 
-    from kurigram import KurigramClient
+    from kurigram_addons import KurigramClient
 
     app = KurigramClient(...)
     app.include_conversation(Registration)

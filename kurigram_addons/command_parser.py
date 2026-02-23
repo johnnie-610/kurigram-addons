@@ -12,7 +12,7 @@ using function signature introspection.
 
 Example::
 
-    from kurigram import Router
+    from kurigram_addons import Router
 
     router = Router()
 
@@ -24,7 +24,7 @@ Example::
 
 Or use the standalone parser::
 
-    from kurigram.command_parser import parse_command
+    from kurigram_addons.command_parser import parse_command
 
     args = parse_command("/ban 12345 spamming", user_id=int, reason=str)
     # → {"user_id": 12345, "reason": "spamming"}
@@ -144,7 +144,7 @@ def extract_handler_params(
 
         # Skip Depends() parameters
         if param.default is not inspect.Parameter.empty:
-            from kurigram.depends import Depends
+            from kurigram_addons.depends import Depends
 
             if isinstance(param.default, Depends):
                 continue

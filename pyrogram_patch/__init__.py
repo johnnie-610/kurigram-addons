@@ -8,6 +8,20 @@
 # file that was distributed with this source code
 
 
+import os as _os
+import warnings as _warnings
+
+# Only warn when imported directly by user code, not by kurigram_addons
+_caller = _os.environ.get("_KURIGRAM_ADDONS_INTERNAL")
+if not _caller:
+    _warnings.warn(
+        "Importing from 'pyrogram_patch' is deprecated. "
+        "Use 'from kurigram_addons import ...' instead. "
+        "This shim will be removed in v1.0.0.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 from pyrogram_patch.patch import PatchManager, patch
 
 __all__ = [

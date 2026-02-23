@@ -11,7 +11,7 @@ Use as a decorator or middleware to throttle handlers.
 
 Example::
 
-    from kurigram import RateLimit
+    from kurigram_addons import RateLimit
 
     @router.on_command("generate")
     @RateLimit(per_user=3, window=60, message="Slow down! {remaining}s left.")
@@ -20,7 +20,7 @@ Example::
 
 Or as middleware::
 
-    from kurigram import RateLimitMiddleware
+    from kurigram_addons import RateLimitMiddleware
 
     app.include_middleware(RateLimitMiddleware(per_user=5, window=30))
 """

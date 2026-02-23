@@ -12,7 +12,7 @@ them before calling the handler.
 
 Example::
 
-    from kurigram import Depends
+    from kurigram_addons import Depends
 
     async def get_user(client, update):
         return await db.get_user(update.from_user.id)
