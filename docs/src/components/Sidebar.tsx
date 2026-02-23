@@ -12,6 +12,19 @@ const NAV: NavItem[] = [
   { title: "Home", href: "/" },
   { title: "Getting Started", href: "/getting-started" },
   {
+    title: "kurigram-addons",
+    children: [
+      { title: "Overview", href: "/kurigram-addons" },
+      { title: "KurigramClient", href: "/kurigram-addons/client" },
+      { title: "Conversation Handler", href: "/kurigram-addons/conversation" },
+      { title: "Menu System", href: "/kurigram-addons/menu" },
+      { title: "Dependency Injection", href: "/kurigram-addons/depends" },
+      { title: "Rate Limiting", href: "/kurigram-addons/rate-limit" },
+      { title: "Command Parser", href: "/kurigram-addons/command-parser" },
+      { title: "Auto FloodWait", href: "/kurigram-addons/flood-wait" },
+    ],
+  },
+  {
     title: "PyKeyboard",
     children: [
       { title: "Overview", href: "/pykeyboard" },

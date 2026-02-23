@@ -1,406 +1,308 @@
+"""showcase_bot.py — Demonstrates all kurigram-addons v0.4.0 features.
+
+Run:
+    BOT_TOKEN=... API_ID=... API_HASH=... python showcase_bot.py
+"""
+
 import asyncio
 import logging
 import os
-from typing import Union
 
-from pyrogram import Client, filters
+# ── All imports from the unified namespace ──────────────────────
+from kurigram_addons import (
+    KurigramClient,
+    Router,
+    MemoryStorage,
+    InlineKeyboard,
+    InlineButton,
+    ReplyKeyboard,
+    ReplyButton,
+    Conversation,
+    ConversationState,
+    Menu,
+    Depends,
+    RateLimit,
+    parse_command,
+)
+from pyrogram import filters
 from pyrogram.types import CallbackQuery, Message
 
-# Pyrogram Patch Imports
-from pyrogram_patch import PatchManager, patch
-from pyrogram_patch.fsm import State, StatesGroup, StateFilter
-from pyrogram_patch.fsm.storages import MemoryStorage, RedisStorage
-from pyrogram_patch.middlewares import MiddlewareManager, PatchHelper
-from pyrogram_patch.router import Router
-from pyrogram_patch.config import get_config
-
-# PyKeyboard Imports
-from pykeyboard import (
-    InlineButton,
-    InlineKeyboard,
-    ReplyButton,
-    ReplyKeyboard,
-    PaginationError,
-    PaginationUnchangedError,
-)
-
-# Configure Logging
+# ── Logging ─────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("ShowcaseBot")
 
-# Load Configuration
-config = get_config()
 
-# App initialization
-app = Client(
-    "pyrogram_patch_showcase",
+# ═══════════════════════════════════════════════════════════════
+# 1. ROUTER + CONVENIENCE DECORATORS
+# ═══════════════════════════════════════════════════════════════
+
+router = Router()
+
+
+@router.on_command("start")
+async def start_cmd(client, message: Message):
+    """Entry point — show main menu."""
+    kb = InlineKeyboard(row_width=2)
+    kb.button("📝 Registration", callback="demo:registration")
+    kb.button("📋 Menu System", callback="menu:main")
+    kb.button("⌨️ Keyboards", callback="demo:keyboard")
+    kb.button("🔧 Commands", callback="demo:commands")
+    kb.button("⚡ Rate Limit", callback="demo:rate_limit")
+
+    await message.reply(
+        "👋 **kurigram-addons v0.4.0 Showcase**\n\n"
+        "Pick a feature to explore:",
+        reply_markup=kb,
+    )
+
+
+@router.on_command("ping")
+async def ping_cmd(client, message: Message):
+    """Simple ping handler."""
+    await message.reply("🏓 **Pong!**")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 2. CONVERSATION HANDLER (class-based FSM)
+# ═══════════════════════════════════════════════════════════════
+
+
+class Registration(Conversation):
+    """Multi-step registration flow using declarative states."""
+
+    name = ConversationState(initial=True)
+    age = ConversationState()
+    confirm = ConversationState()
+
+    @name.on_enter
+    async def ask_name(self, ctx):
+        await ctx.message.reply("📝 **Registration**\n\nWhat is your name?")
+
+    @name.on_message
+    async def save_name(self, ctx):
+        await ctx.helper.update_data(name=ctx.message.text)
+        await self.goto(ctx, self.age)
+
+    @age.on_enter
+    async def ask_age(self, ctx):
+        await ctx.message.reply("How old are you?")
+
+    @age.on_message
+    async def save_age(self, ctx):
+        if not ctx.message.text.isdigit():
+            await ctx.message.reply("Please enter a number.")
+            return
+        age = int(ctx.message.text)
+        if age < 1 or age > 120:
+            await ctx.message.reply("Enter a valid age (1–120).")
+            return
+        await ctx.helper.update_data(age=age)
+        await self.goto(ctx, self.confirm)
+
+    @confirm.on_enter
+    async def ask_confirm(self, ctx):
+        data = await ctx.helper.get_data()
+        await ctx.message.reply(
+            f"✅ **Confirm your details:**\n\n"
+            f"👤 Name: {data.get('name')}\n"
+            f"🎂 Age: {data.get('age')}\n\n"
+            f"Type **yes** to confirm or **no** to cancel."
+        )
+
+    @confirm.on_message
+    async def do_confirm(self, ctx):
+        if ctx.message.text.lower() == "yes":
+            data = await ctx.helper.get_data()
+            await ctx.message.reply(
+                f"🎉 **Registration Complete!**\n"
+                f"Welcome, {data.get('name')}!"
+            )
+        else:
+            await ctx.message.reply("❌ Registration cancelled.")
+        await self.finish(ctx)
+
+
+@router.on_callback("demo:registration")
+async def start_registration(client, query: CallbackQuery):
+    """Trigger registration conversation from button."""
+    await query.answer("Starting registration...")
+    await query.message.reply("Let's begin! Type /register to start.")
+
+
+@router.on_command("register")
+async def register_cmd(client, message: Message, patch_helper):
+    """Start the registration conversation."""
+    reg = Registration()
+    from kurigram_addons.conversation import ConversationContext
+
+    ctx = ConversationContext(
+        client=client, message=message, helper=patch_helper
+    )
+    await reg.start(ctx)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 3. MENU SYSTEM (declarative with auto back-button)
+# ═══════════════════════════════════════════════════════════════
+
+main_menu = Menu("main", text="📋 **Main Menu**\n\nChoose a section:")
+main_menu.button("👤 Profile", goto="profile")
+main_menu.button("⚙️ Settings", goto="settings")
+main_menu.button("📊 Stats", callback=lambda c, q: q.answer("📊 Stats coming soon!", show_alert=True))
+
+profile_menu = Menu("profile", text="👤 **Profile**\n\nManage your profile:", parent=main_menu)
+profile_menu.button("✏️ Edit Name", callback=lambda c, q: q.answer("✏️ Edit name", show_alert=True))
+profile_menu.button("📸 Change Photo", callback=lambda c, q: q.answer("📸 Photo upload", show_alert=True))
+
+settings_menu = Menu("settings", text="⚙️ **Settings**\n\nConfigure your preferences:", parent=main_menu)
+settings_menu.button("🔔 Notifications", callback=lambda c, q: q.answer("🔔 Toggle notif", show_alert=True))
+settings_menu.button("🌐 Language", callback=lambda c, q: q.answer("🌐 Pick lang", show_alert=True))
+
+
+# ═══════════════════════════════════════════════════════════════
+# 4. KEYBOARD ↔ ROUTER INTEGRATION
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.on_callback("demo:keyboard")
+async def keyboard_demo(client, query: CallbackQuery):
+    """Show keyboard with button() shorthand."""
+    kb = InlineKeyboard(row_width=2)
+    kb.button("🔴 Red", callback="color:red")
+    kb.button("🔵 Blue", callback="color:blue")
+    kb.button("🟢 Green", callback="color:green")
+    kb.button("🟡 Yellow", callback="color:yellow")
+
+    await query.edit_message_text(
+        "⌨️ **Keyboard Demo**\n\nPick a color:", reply_markup=kb
+    )
+
+
+@router.on_callback("color:red")
+async def red_cb(client, query):
+    await query.answer("🔴 You chose Red!", show_alert=True)
+
+
+@router.on_callback("color:blue")
+async def blue_cb(client, query):
+    await query.answer("🔵 You chose Blue!", show_alert=True)
+
+
+@router.on_callback("color:green")
+async def green_cb(client, query):
+    await query.answer("🟢 You chose Green!", show_alert=True)
+
+
+@router.on_callback("color:yellow")
+async def yellow_cb(client, query):
+    await query.answer("🟡 You chose Yellow!", show_alert=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 5. COMMAND PARSER (typed arguments)
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.on_callback("demo:commands")
+async def commands_demo(client, query: CallbackQuery):
+    """Show command parser instructions."""
+    await query.edit_message_text(
+        "🔧 **Command Parser Demo**\n\n"
+        "Try these commands:\n"
+        "• `/greet John 25` — typed args\n"
+        "• `/ban 12345 spamming` — parse ID + reason\n"
+    )
+
+
+@router.on_command("greet")
+async def greet_cmd(client, message: Message):
+    """Greet with typed args: /greet <name> <age>"""
+    try:
+        args = parse_command(message.text, name=str, age=int)
+        name = args.get("name", "stranger")
+        age = args.get("age", "?")
+        await message.reply(f"👋 Hello **{name}**, age **{age}**!")
+    except Exception as e:
+        await message.reply(f"Usage: `/greet <name> <age>`\nError: {e}")
+
+
+@router.on_command("ban")
+async def ban_cmd(client, message: Message):
+    """Ban with typed args: /ban <user_id> <reason>"""
+    try:
+        args = parse_command(message.text, user_id=int, reason=str)
+        uid = args.get("user_id", 0)
+        reason = args.get("reason", "No reason")
+        await message.reply(f"🔨 Banned user `{uid}`: {reason}")
+    except Exception as e:
+        await message.reply(f"Usage: `/ban <user_id> <reason>`\nError: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 6. RATE LIMITER
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.on_callback("demo:rate_limit")
+async def rate_limit_demo(client, query: CallbackQuery):
+    """Show rate limit instructions."""
+    await query.edit_message_text(
+        "⚡ **Rate Limiter Demo**\n\n"
+        "Try spamming `/limited` — you get 3 calls per 30s."
+    )
+
+
+@router.on_command("limited")
+@RateLimit(per_user=3, window=30, message="⏳ Slow down! Try again in {remaining}s.")
+async def limited_cmd(client, message: Message):
+    """Rate-limited command (3 per 30s per user)."""
+    await message.reply("✅ This call went through!")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 7. DEPENDENCY INJECTION
+# ═══════════════════════════════════════════════════════════════
+
+async def get_user_info(client, update):
+    """Dependency: resolve user info from any update."""
+    user = getattr(update, "from_user", None)
+    if user:
+        return {"id": user.id, "name": user.first_name}
+    return {"id": 0, "name": "Unknown"}
+
+
+@router.on_command("whoami")
+async def whoami_cmd(client, message: Message, user=Depends(get_user_info)):
+    """Show user info resolved by DI."""
+    await message.reply(
+        f"🆔 **Your Info**\n"
+        f"ID: `{user['id']}`\n"
+        f"Name: {user['name']}"
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+# MAIN — KurigramClient replaces patch()
+# ═══════════════════════════════════════════════════════════════
+
+app = KurigramClient(
+    "showcase_bot",
     api_id=int(os.getenv("API_ID", "12345")),
     api_hash=os.getenv("API_HASH", "abcdef"),
     bot_token=os.getenv("BOT_TOKEN", "123:ABC"),
     in_memory=True,
+    storage=MemoryStorage(),
+    auto_flood_wait=True,
+    max_flood_wait=60,
 )
 
-
-# --- Direct Client Handlers (Coexistence Test) ---
-@app.on_message(filters.command("ping") & filters.private)
-async def ping_handler(client: Client, message: Message):
-    """Direct handler that doesn't use the router system."""
-    await message.reply_text("🏓 **Pong!** (Direct Handler)")
-
-
-# --- FSM Definition ---
-class DemoStates(StatesGroup):
-    """FSM States for the form demo."""
-    
-    waiting_for_name = State()
-    waiting_for_age = State()
-    waiting_for_bio = State()
-    
-    # Define valid transitions (Optional, for State Guards)
-    transitions = {
-        waiting_for_name: [waiting_for_age],
-        waiting_for_age: [waiting_for_bio],
-        waiting_for_bio: []  # End state
-    }
-
-
-# --- Keyboards ---
-def make_main_menu() -> InlineKeyboard:
-    """Create the main menu keyboard."""
-    keyboard = InlineKeyboard()
-    keyboard.add(
-        InlineButton(text="📝 FSM Demo", callback_data="demo:fsm"),
-        InlineButton(text="⌨️ Keyboard Demo", callback_data="demo:keyboard"),
-    )
-    keyboard.add(
-        InlineButton(text="🧩 Middleware Test", callback_data="demo:middleware"),
-        InlineButton(text="💾 Storage Health", callback_data="demo:storage"),
-    )
-    keyboard.add(InlineButton(text="🔄 Refresh", callback_data="main_menu"))
-    return keyboard
-
-
-def make_pagination_kb(page: int = 1) -> InlineKeyboard:
-    """Create a pagination demo keyboard."""
-    keyboard = InlineKeyboard()
-    try:
-        keyboard.paginate(
-            count_pages=10,
-            current_page=page,
-            callback_pattern="page:{number}",
-        )
-    except PaginationError as e:
-        logger.error(f"Pagination error: {e}")
-    
-    keyboard.add(InlineButton(text="🔙 Back to Main", callback_data="main_menu"))
-    return keyboard
-
-
-def make_form_kb() -> ReplyKeyboard:
-    """Create a reply keyboard for the form."""
-    keyboard = ReplyKeyboard(
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        placeholder="Type something...",
-    )
-    keyboard.add(
-        ReplyButton(text="❌ Cancel"),
-        ReplyButton(text="skip"),
-    )
-    return keyboard
-
-
-# --- Middleware ---
-async def simple_logging_middleware(
-    update: Union[Message, CallbackQuery], client: Client, patch_helper: PatchHelper
-):
-    """Example 'before' middleware that logs updates."""
-    user_id = update.from_user.id if update.from_user else "Unknown"
-    logger.info(f"[Before Middleware] Processing update from user {user_id}")
-
-
-async def update_counter_middleware(update: Union[Message, CallbackQuery], patch_helper: PatchHelper):
-    """Example 'before' middleware that counts updates using patch_helper.data."""
-    # Shared data across all middlewares and the main handler
-    # Note: patch_helper.data is an async property and must be awaited
-    helper_data = await patch_helper.data
-    count = helper_data.get("update_count", 0) + 1
-    
-    # We use update_data for concurrent-safe and FSM-synced updates
-    await patch_helper.update_data(update_count=count, is_tracked=True)
-    
-    logger.info(f"[Before Middleware] Update # {count} received")
-
-
-async def latency_measurement_middleware(handler, update, client, patch_helper: PatchHelper):
-    """Example 'around' middleware that provides a detailed latency breakdown."""
-    import time
-    from datetime import datetime
-    
-    # 1. Record start of this middleware
-    middleware_start = time.time()
-    
-    # 2. Extract when the update was sent and received
-    helper_data = await patch_helper.data
-    received_at = helper_data.get("__received_at__", middleware_start)
-    
-    sent_at = getattr(update, "date", None)
-    if sent_at is None and hasattr(update, "message"):
-        sent_at = getattr(update.message, "date", None)
-    
-    # 3. Calculate breakdown
-    delivery_latency = (received_at - sent_at.timestamp()) * 1000 if sent_at else 0
-    library_overhead = (middleware_start - received_at) * 1000
-    
-    # 4. Execute handler
-    result = await handler()
-    
-    # 5. Calculate execution time
-    execution_time = (time.time() - middleware_start) * 1000
-    
-    logger.info(
-        f"⏱️ **Latency Breakdown**\n"
-        f"  ├ Telegram Delivery: {delivery_latency:.2f}ms\n"
-        f"  ├ Library Overhead: {library_overhead:.2f}ms\n"
-        f"  └ Handler Execution: {execution_time:.2f}ms (including API calls)"
-    )
-    
-    return result
-
-
-async def cleanup_logging_middleware(update: Union[Message, CallbackQuery]):
-    """Example 'after' middleware that runs after processing is complete."""
-    logger.info("[After Middleware] Finished processing current update.")
-
-
-# --- Routers ---
-root_router = Router()
-fsm_router = Router()
-keyboard_router = Router()
-
-# Include sub-routers (Demonstrating Router Nesting)
-root_router.include_router(fsm_router)
-root_router.include_router(keyboard_router)
-
-
-# --- Handlers: Main ---
-@root_router.on_message(filters.command("start") & filters.private)
-async def start_cmd(client: Client, message: Message, patch_helper: PatchHelper):
-    """Start command handler."""
-    await message.reply_text(
-        "👋 **Welcome to Pyrogram Patch Showcase!**\n\n"
-        "This bot demonstrates the features of `pyrogram_patch` and `pykeyboard`.\n"
-        "Explore the features using the menu below.",
-        reply_markup=make_main_menu(),
-    )
-
-
-@root_router.on_callback_query(filters.regex("^main_menu$"))
-async def main_menu_cb(client: Client, callback: CallbackQuery, patch_helper: PatchHelper):
-    """Return to main menu."""
-    from pyrogram.errors import MessageNotModified
-    
-    try:
-        await callback.edit_message_text(
-            "👋 **Main Menu**\n\nChoose a demo:",
-            reply_markup=make_main_menu()
-        )
-    except MessageNotModified:
-        # Ignore if the menu is already up-to-date
-        await callback.answer("Menu is up to date!")
-    except Exception as e:
-        logger.error(f"Error refreshing menu: {e}")
-        await callback.answer("Error refreshing menu.")
-
-
-# --- Handlers: Storage & Middleware ---
-@root_router.on_callback_query(filters.regex("^demo:storage$"))
-async def storage_demo_cb(client: Client, callback: CallbackQuery, patch_helper: PatchHelper):
-    """Check storage health."""
-    is_healthy = await patch_helper.storage.health()
-    status = "✅ Healthy" if is_healthy else "❌ Unhealthy"
-    
-    storage_type = type(patch_helper.storage).__name__
-    
-    await callback.answer(f"Storage: {storage_type}\nStatus: {status}", show_alert=True)
-
-
-@root_router.on_callback_query(filters.regex("^demo:middleware$"))
-async def middleware_demo_cb(client: Client, callback: CallbackQuery, patch_helper: PatchHelper):
-    """Trigger middleware test."""
-    # The middleware log should appear in console
-    await callback.answer("Check the console logs for middleware output!", show_alert=True)
-
-
-# --- Handlers: FSM Demo ---
-@fsm_router.on_callback_query(filters.regex("^demo:fsm$"))
-async def start_fsm_demo(client: Client, callback: CallbackQuery, patch_helper: PatchHelper):
-    """Start FSM flow."""
-    await patch_helper.set_state(str(DemoStates.waiting_for_name))
-    await callback.message.reply_text(
-        "📝 **FSM Demo Started**\n\nWhat is your name?",
-        reply_markup=make_form_kb()
-    )
-    await callback.answer()
-
-
-@fsm_router.on_message(filters.regex("^❌ Cancel$") & filters.private & filters.text)
-async def cancel_fsm(client: Client, message: Message, patch_helper: PatchHelper):
-    """Cancel FSM flow."""
-    current_state = patch_helper.state
-    if current_state and current_state != "*":
-        await patch_helper.finish()
-        await message.reply_text("❌ Operation cancelled.", reply_markup=make_main_menu())
-    else:
-        await message.reply_text("❌ Operation cancelled.", reply_markup=make_main_menu())
-
-@fsm_router.on_message(filters.regex("^skip$") & filters.private & filters.text)
-async def skip_fsm(client: Client, message: Message, patch_helper: PatchHelper):
-    """Skip FSM flow."""
-    await patch_helper.finish()
-    await message.reply_text("❌ Operation skipped.", reply_markup=make_main_menu())
-
-
-@fsm_router.on_message(StateFilter(DemoStates.waiting_for_name) & filters.private & filters.text)
-async def name_step(client: Client, message: Message, patch_helper: PatchHelper):
-    """Handle name input."""
-    name = message.text
-    
-    # Update data with kwargs
-    await patch_helper.update_data(name=name)
-    
-    await patch_helper.set_state(str(DemoStates.waiting_for_age))
-    await message.reply_text(f"Nice to meet you, {name}!\n\nNow, how old are you?")
-
-
-@fsm_router.on_message(StateFilter(DemoStates.waiting_for_age) & filters.private & filters.text)
-async def age_step(client: Client, message: Message, patch_helper: PatchHelper):
-    """Handle age input."""
-    if not message.text.isdigit():
-        await message.reply_text("Please enter a valid number.")
-        return
-    elif message.text.isdigit() and (int(message.text) < 0 or int(message.text) > 120):
-        await message.reply_text("Please enter a valid age.")
-        return
-
-    age = int(message.text)
-    # Use update_data kwarg syntax
-    await patch_helper.update_data(age=age)
-    
-    await patch_helper.set_state(str(DemoStates.waiting_for_bio))
-    await message.reply_text("Great! Finally, tell me a bit about yourself.")
-
-
-@fsm_router.on_message(StateFilter(DemoStates.waiting_for_bio) & filters.private & filters.text)
-async def bio_step(client: Client, message: Message, patch_helper: PatchHelper):
-    """Handle bio input and finish."""
-    bio = message.text
-    data = await patch_helper.data
-    
-    summary = (
-        "📋 **Form Summary**\n\n"
-        f"👤 Name: {data.get('name')}\n"
-        f"🎂 Age: {data.get('age')}\n"
-        f"📝 Bio: {bio}"
-    )
-    
-    await patch_helper.finish()
-    await message.reply_text(summary, reply_markup=make_main_menu())
-
-
-# --- Handlers: Keyboard Demo ---
-@keyboard_router.on_callback_query(filters.regex("^demo:keyboard$"))
-async def keyboard_demo_cb(client: Client, callback: CallbackQuery, patch_helper: PatchHelper):
-    """Start keyboard demo."""
-    await callback.edit_message_text(
-        "⌨️ **Keyboard Demo**\n\nCheck out the pagination below:",
-        reply_markup=make_pagination_kb(1)
-    )
-
-
-@keyboard_router.on_callback_query(filters.regex(r"^page:(\d+)$"))
-async def pagination_handler(client: Client, callback: CallbackQuery, patch_helper: PatchHelper):
-    """Handle pagination."""
-    page = int(callback.matches[0].group(1))
-    
-    try:
-        await callback.edit_message_reply_markup(
-            reply_markup=make_pagination_kb(page)
-        )
-    except PaginationUnchangedError:
-        # Ignore if user clicks the same page
-        await callback.answer("You are already on this page.")
-    except Exception as e:
-        logger.error(f"Pagination error: {e}")
-        await callback.answer("Error navigating pages.")
-
-
-# --- Main Application ---
-async def main():
-    """Main entry point."""
-    
-    # Debug: Force logging to stdout
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    logging.getLogger("pyrogram_patch").addHandler(console_handler)
-    logging.getLogger("ShowcaseBot").addHandler(console_handler)
-
-    # 1. Patch the Client
-    logger.info("Patching Pyrogram Client...")
-    patch_manager = await patch(app)
-    
-    # 2. Setup Storage
-    # Use Redis if configured, otherwise Memory
-    if config.storage.redis_url:
-        storage = RedisStorage(config.storage.redis_url)
-        logger.info(f"Using Redis Storage: {config.storage.redis_url}")
-    else:
-        storage = MemoryStorage()
-        logger.info("Using Memory Storage")
-    
-    await patch_manager.set_storage(storage)
-    
-    # 3. Setup Middleware
-    logger.info("Registering Middleware...")
-    
-    # Register 'before' middlewares
-    await patch_manager.include_middleware(simple_logging_middleware, kind="before", priority=10)
-    await patch_manager.include_middleware(update_counter_middleware, kind="before", priority=5)
-    
-    # Register 'around' middleware (wraps the handler)
-    await patch_manager.include_middleware(latency_measurement_middleware, kind="around")
-    
-    # Register 'after' middleware
-    await patch_manager.include_middleware(cleanup_logging_middleware, kind="after")
-    
-    # 4. Register Routers
-    logger.info("Registering Routers...")
-    patch_manager.include_router(root_router)
-    
-    # 5. Start App
-    logger.info("Starting Bot...")
-    try:
-        await app.start()
-        print("Bot started successfully! Send /start to start the bot.")
-        
-        # Keep running
-        from pyrogram import idle
-        await idle()
-    except Exception as e:
-        logger.error(f"Failed to start bot: {e}")
-    finally:
-        logger.info("Stopping Bot...")
-        try:
-            await app.stop()
-        except ConnectionError:
-            pass # Already stopped
+# Register everything
+app.include_router(router)
+app.include_menus(main_menu, profile_menu, settings_menu)
 
 if __name__ == "__main__":
-    try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        pass
+    logger.info("Starting showcase bot...")
+    app.run()
