@@ -90,6 +90,12 @@ from pyrogram_patch.errors import (
     ValidationError,
 )
 
+# ── Phase 3: DX Improvements ───────────────────────────────────
+from kurigram.command_parser import CommandParseError, parse_command
+from kurigram.depends import Depends, resolve_dependencies
+from kurigram.flood_wait import FloodWaitHandler
+from kurigram.rate_limit import RateLimit
+
 # ── Version ─────────────────────────────────────────────────────
 __version__ = "0.4.0-dev"
 
@@ -140,4 +146,11 @@ __all__ = [
     "FSMTransitionError",
     "MiddlewareError",
     "RouterError",
+    # DX Improvements
+    "FloodWaitHandler",
+    "parse_command",
+    "CommandParseError",
+    "Depends",
+    "resolve_dependencies",
+    "RateLimit",
 ]
