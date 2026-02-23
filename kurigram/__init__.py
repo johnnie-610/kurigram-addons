@@ -25,6 +25,12 @@ Example::
 # ── Client ──────────────────────────────────────────────────────
 from kurigram.client import KurigramClient
 
+# ── Conversation handler ────────────────────────────────────────
+from kurigram.conversation import Conversation, ConversationContext, ConversationState
+
+# ── Menu system ─────────────────────────────────────────────────
+from kurigram.menu import Menu, MenuButton
+
 # ── Keyboards (from pykeyboard) ────────────────────────────────
 from pykeyboard import (
     Button,
@@ -90,6 +96,13 @@ __version__ = "0.4.0-dev"
 __all__ = [
     # Client
     "KurigramClient",
+    # Conversation
+    "Conversation",
+    "ConversationState",
+    "ConversationContext",
+    # Menu
+    "Menu",
+    "MenuButton",
     # Legacy (deprecated but available)
     "PatchManager",
     "patch",

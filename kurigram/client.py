@@ -206,7 +206,73 @@ class KurigramClient(Client):
         if self._pool:
             await self._pool.set_storage(storage)
 
-    # ── Lifecycle overrides ─────────────────────────────────────
+    def _ensure_default_router(self) -> "Router":
+        """Get or create a default Router for conversation/menu handlers."""
+        if not hasattr(self, "_default_router") or self._default_router is None:
+            from pyrogram_patch.router.router import Router
+
+            self._default_router = Router()
+            self.include_router(self._default_router)
+        return self._default_router
+
+    def include_conversation(
+        self, conversation_cls: type, **kwargs: Any
+    ) -> None:
+        """Include a Conversation class and register its handlers.
+
+        Instantiates the conversation and registers its state handlers
+        on a default internal router.
+
+        Args:
+            conversation_cls: A :class:`Conversation` subclass.
+            **kwargs: Arguments passed to the conversation constructor.
+
+        Example::
+
+            app.include_conversation(Registration)
+        """
+        from kurigram.conversation import Conversation
+
+        if not (
+            isinstance(conversation_cls, type)
+            and issubclass(conversation_cls, Conversation)
+        ):
+            raise errors.ValidationError(
+                field="conversation_cls",
+                value=str(conversation_cls),
+                reason="Expected a Conversation subclass",
+            )
+
+        instance = conversation_cls(**kwargs)
+        router = self._ensure_default_router()
+        instance.register_handlers(router)
+        logger.info("Conversation '%s' included", conversation_cls.__name__)
+
+    def include_menus(self, *menus: Any) -> None:
+        """Register one or more Menu instances.
+
+        Each menu's callback handlers are registered on a default
+        internal router.
+
+        Args:
+            *menus: :class:`Menu` instances to register.
+
+        Example::
+
+            app.include_menus(main_menu, settings_menu)
+        """
+        from kurigram.menu import Menu
+
+        router = self._ensure_default_router()
+        for menu in menus:
+            if not isinstance(menu, Menu):
+                raise errors.ValidationError(
+                    field="menu",
+                    value=type(menu).__name__,
+                    reason="Expected a Menu instance",
+                )
+            menu.register_handlers(router)
+            logger.info("Menu '%s' included", menu.name)
 
     async def start(
         self,
