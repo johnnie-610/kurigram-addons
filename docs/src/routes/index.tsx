@@ -106,7 +106,7 @@ function FeatureCard(props: { icon: string; title: string; description: string; 
       style={{ background: "var(--color-surface)" }}
     >
       <div class="text-2xl mb-3">{props.icon}</div>
-      <h3 class="text-lg font-semibold mb-2 group-hover:text-amber-400 transition-colors">{props.title}</h3>
+      <h3 class="text-lg font-semibold mb-2 text-white group-hover:text-amber-400 transition-colors">{props.title}</h3>
       <p class="text-sm text-slate-400 leading-relaxed">{props.description}</p>
     </A>
   );
