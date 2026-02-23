@@ -17,7 +17,7 @@ jobs:
       contents: read
 
     environment:
-      name: pypi
+      name: release
       url: https://pypi.org/p/kurigram-addons
 
     steps:
