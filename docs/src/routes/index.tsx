@@ -11,7 +11,7 @@ export default function Home() {
       <section class="hero-gradient rounded-2xl p-8 sm:p-12 mb-12 animate-fade-in-up">
         <div class="flex flex-col items-center text-center">
           <img
-            src="/logo.png"
+            src={`${import.meta.env.BASE_URL}logo.png`}
             alt="kurigram-addons"
             class="w-20 h-20 rounded-2xl mb-6 animate-float shadow-lg shadow-amber-500/20"
           />

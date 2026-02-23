@@ -181,7 +181,7 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
     >
       {/* Logo */}
       <div class="flex items-center gap-3 px-3 pb-2 border-b border-white/10">
-        <img src="/logo.png" alt="kurigram-addons" class="w-8 h-8 rounded-lg" />
+        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="kurigram-addons" class="w-8 h-8 rounded-lg" />
         <div class="flex-1">
           <div class="font-bold text-sm text-amber-400">kurigram-addons</div>
           <div class="text-[0.65rem] text-slate-500">Documentation</div>

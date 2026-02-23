@@ -9,7 +9,7 @@ export default createHandler(() => (
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta name="description" content="Modern Telegram bot toolkit for Kurigram/Pyrogram — declarative keyboards, FSM, middlewares, circuit breaker" />
-          <link rel="icon" href="/logo.png" />
+          <link rel="icon" href={`${import.meta.env.BASE_URL || "/"}logo.png`} />
           <script>{`
             (function() {
               var t = localStorage.getItem('theme');
