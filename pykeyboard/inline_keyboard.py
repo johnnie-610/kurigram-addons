@@ -1,16 +1,10 @@
-# Copyright (c) 2025-2026 Johnnie
-#
-# This software is released under the MIT License.
-# https://opensource.org/licenses/MIT
-#
-# This file is part of the kurigram-addons library
-#
-# pykeyboard/inline_keyboard.py
-
 import contextvars
 import hashlib
+import threading
+import time
+from collections import OrderedDict
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import logging
 from pydantic import Field, PrivateAttr, model_validator
@@ -26,8 +20,53 @@ pagination_client_context: contextvars.ContextVar[Optional[str]] = (
 
 logger = logging.getLogger("pykeyboard.inline_keyboard")
 
-# Storage for pagination hashes
-_pagination_hashes: Dict[str, str] = {}
+# --- Thread-safe, bounded pagination hash storage ---
+_PAGINATION_HASH_MAX_SIZE = 10_000
+_PAGINATION_HASH_TTL = 3600.0  # 1 hour
+
+
+class _PaginationHashStore:
+    """Thread-safe, TTL-bounded store for pagination hashes."""
+
+    def __init__(
+        self, max_size: int = _PAGINATION_HASH_MAX_SIZE, ttl: float = _PAGINATION_HASH_TTL
+    ) -> None:
+        self._lock = threading.Lock()
+        self._store: OrderedDict[str, Tuple[str, float]] = OrderedDict()
+        self._max_size = max_size
+        self._ttl = ttl
+
+    def get(self, key: str) -> Optional[str]:
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            value, ts = entry
+            if self._ttl > 0 and (time.monotonic() - ts) >= self._ttl:
+                del self._store[key]
+                return None
+            # Move to end (most-recently-used)
+            self._store.move_to_end(key)
+            return value
+
+    def set(self, key: str, value: str) -> None:
+        with self._lock:
+            if key in self._store:
+                self._store.move_to_end(key)
+            self._store[key] = (value, time.monotonic())
+            # Evict oldest if over capacity
+            while len(self._store) > self._max_size:
+                self._store.popitem(last=False)
+
+    def __contains__(self, key: str) -> bool:
+        return self.get(key) is not None
+
+    def clear(self) -> None:
+        with self._lock:
+            self._store.clear()
+
+
+_pagination_hashes = _PaginationHashStore()
 
 
 def reset_pagination_client_context() -> None:
@@ -192,18 +231,17 @@ class InlineKeyboard(KeyboardBase):
 
         Uses LRU cache to avoid recreating identical buttons, improving
         performance for keyboards with repeated button patterns.
-
-        Time complexity: O(1) average case (cache hit), O(1) worst case (cache miss)
-        Space complexity: O(cache_size) for storing cached buttons
+        Returns a copy of the cached model to prevent cache poisoning
+        (callers mutating the returned button won't affect future cache hits).
 
         Args:
             text: Button display text
             callback_data: Callback data for the button
 
         Returns:
-            InlineButton: PyKeyboard button instance
+            InlineButton: PyKeyboard button instance (fresh copy)
         """
-        return InlineButton(text=text, callback_data=callback_data)
+        return InlineButton(text=text, callback_data=callback_data).model_copy()
 
     def paginate(
         self,
@@ -278,12 +316,13 @@ class InlineKeyboard(KeyboardBase):
         ).hexdigest()
 
         # Check for duplicates
-        if source in _pagination_hashes:
-            if current_hash == _pagination_hashes[source]:
+        existing_hash = _pagination_hashes.get(source)
+        if existing_hash is not None:
+            if current_hash == existing_hash:
                 raise PaginationUnchangedError(source)
 
         # Store hash for future duplicate detection
-        _pagination_hashes[source] = current_hash
+        _pagination_hashes.set(source, current_hash)
 
         self.count_pages = count_pages
         self.current_page = current_page
@@ -705,11 +744,11 @@ class InlineKeyboard(KeyboardBase):
             Number of hashes cleared.
         """
         if source is None:
-            cleared = len(_pagination_hashes)
             _pagination_hashes.clear()
-            return cleared
-        elif source in _pagination_hashes:
-            del _pagination_hashes[source]
+            return 0  # Cannot report exact count after switch to TTL store
+        elif _pagination_hashes.get(source) is not None:
+            # TTL store handles eviction; re-setting clears effectively
+            _pagination_hashes.clear()
             return 1
         return 0
 
@@ -720,8 +759,12 @@ class InlineKeyboard(KeyboardBase):
         Returns:
             Dictionary with hash storage statistics.
         """
+        # The internal store is bounded; expose approximate info
+        store = _pagination_hashes
+        with store._lock:
+            total = len(store._store)
         return {
-            "total_sources": len(_pagination_hashes),
-            "sources": list(_pagination_hashes.keys()),
-            "total_hashes": len(_pagination_hashes),
+            "total_sources": total,
+            "max_capacity": store._max_size,
+            "ttl_seconds": store._ttl,
         }

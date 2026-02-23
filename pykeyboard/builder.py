@@ -10,6 +10,9 @@
 import re
 from typing import Any, Callable, Dict, List, Optional, Union
 
+# Telegram API limits
+TELEGRAM_CALLBACK_DATA_LIMIT = 64  # bytes
+
 from .errors import ValidationError
 from .inline_keyboard import InlineKeyboard
 from .keyboard_base import Button, InlineButton, KeyboardBase
@@ -94,6 +97,14 @@ class KeyboardBuilder:
             # Auto-generate callback_data from text for inline keyboards
             if isinstance(self.keyboard, InlineKeyboard):
                 callback_data = re.sub(r"[^\w]+", "_", btn_spec).strip("_").lower()
+                if not callback_data:
+                    raise ValidationError(
+                        field="callback_data",
+                        value=btn_spec,
+                        reason="Text produces no valid callback_data after sanitisation",
+                    )
+                if len(callback_data.encode("utf-8")) > TELEGRAM_CALLBACK_DATA_LIMIT:
+                    callback_data = callback_data[:TELEGRAM_CALLBACK_DATA_LIMIT]
                 return InlineButton(text=btn_spec, callback_data=callback_data)
             else:
                 return ReplyButton(text=btn_spec)
@@ -448,13 +459,11 @@ class KeyboardFactory:
         """
         keyboard = InlineKeyboard()
         builder = KeyboardBuilder(keyboard)
-        texts = []
         buttons = []
 
         for i in range(1, max_rating + 1):
             stars = "⭐" * i
             text = f"{stars} ({i})" if include_labels else stars
-            texts.append(text)
             buttons.append(
                 {
                     "text": text,

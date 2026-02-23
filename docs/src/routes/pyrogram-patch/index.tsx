@@ -1,90 +1,138 @@
 import { Title } from "@solidjs/meta";
 import { A } from "@solidjs/router";
+import Layout from "~/components/Layout";
 import CodeBlock from "~/components/CodeBlock";
-import Callout from "~/components/Callout";
 
-export default function PyrogramPatchIndex() {
+export default function PyrogramPatchOverview() {
   return (
-    <div class="pb-20">
-      <Title>Pyrogram Patch Overview - Kurigram Addons</Title>
+    <Layout>
+      <Title>Pyrogram Patch — kurigram-addons</Title>
 
-      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold tracking-widest uppercase mb-4 not-prose">
-        The New Standard
+      <div class="animate-fade-in-up">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-3xl">🔧</span>
+          <h1 class="text-3xl font-bold">Pyrogram Patch</h1>
+        </div>
+        <p class="text-slate-400 mb-8 text-lg">
+          Engine-level patching for Kurigram/Pyrogram that replaces the default dispatcher with a
+          production-grade architecture: hierarchical routers, finite state machines, tri-phase middleware,
+          circuit breaker resilience, and dependency-injected handlers.
+        </p>
       </div>
-      
-      <h1>Pyrogram Reimagined.</h1>
-      
-      <p class="lead text-xl">
-        A non-invasive, high-performance extension for Pyrogram that adds a modern middleware pipeline, hierarchical routing, and a state-of-the-art FSM engine.
-      </p>
 
-      <h2>The Patched Architecture</h2>
-      <p>
-        Building complex bots natively in Pyrogram often leads to massive <code>if/else</code> chains, repetitive database queries, and tangled callback management. Pyrogram Patch solves this by fundamentally upgrading how updates are dispatched.
-      </p>
+      {/* Architecture diagram */}
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Architecture</h2>
+        <div class="p-6 rounded-xl border border-white/10 text-sm font-mono text-center space-y-3" style={{ background: "var(--color-surface)" }}>
+          <div class="text-cyan-400">Telegram Update</div>
+          <div class="text-slate-500">↓</div>
+          <div class="text-amber-400 font-semibold">PatchedDispatcher</div>
+          <div class="text-slate-500">↓</div>
+          <div class="flex justify-center gap-8 flex-wrap">
+            <span class="text-green-400">Before Middleware</span>
+            <span class="text-slate-500">→</span>
+            <span class="text-blue-400">Around Middleware</span>
+            <span class="text-slate-500">→</span>
+            <span class="text-purple-400">Handler + DI</span>
+            <span class="text-slate-500">→</span>
+            <span class="text-green-400">After Middleware</span>
+          </div>
+          <div class="text-slate-500">↕</div>
+          <div class="flex justify-center gap-6 flex-wrap">
+            <span class="px-2 py-1 rounded bg-amber-500/10 text-amber-400">FSM Storage</span>
+            <span class="px-2 py-1 rounded bg-cyan-500/10 text-cyan-400">Circuit Breaker</span>
+            <span class="px-2 py-1 rounded bg-purple-500/10 text-purple-400">PatchHelper DI</span>
+          </div>
+        </div>
+      </section>
 
-      <h3>Non-Invasive Bridge</h3>
-      <p>
-        Instead of forking the library and forcing you to use a custom client, we replace the internal Pyrogram <code>Dispatcher</code> at runtime when you call <code>patch(app)</code>. This "hot-swap" allows your code to use 100% of Pyrogram's native features and updates, but routes them through a much more powerful execution pipeline.
-      </p>
+      {/* Core imports */}
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Import Map</h2>
+        <CodeBlock
+          code={`<span class="cmt"># Core patching</span>
+<span class="imp">from</span> pyrogram_patch <span class="imp">import</span> patch, PatchManager
 
-      <h3>The PatchDataPool</h3>
-      <p>
-        To support thousands of concurrent users, the patch introduces the <code>PatchDataPool</code>. This is a thread-safe, high-concurrency storage layer that sits alongside the dispatcher. It manages middleware dependency injection and isolates FSM contexts for every single user, ensuring zero state bleeding between chats.
-      </p>
+<span class="cmt"># Router</span>
+<span class="imp">from</span> pyrogram_patch.router <span class="imp">import</span> Router
 
-      <h2>Core Capabilities</h2>
-      
-      <ul>
-        <li>
-            <A href="/pyrogram-patch/middlewares" class="font-bold">Tri-Phase Middlewares</A>: Register hooks that fire "before", "around", or "after" your handlers. Perfect for handling database sessions, rate limiting, and authentication.
-        </li>
-        <li>
-            <A href="/pyrogram-patch/routers" class="font-bold">Hierarchical Routers</A>: Stop writing all your handlers in <code>main.py</code>. Our Router system lets you split your bot into dozens of modular files that can easily be plugged in and out.
-        </li>
-        <li>
-            <A href="/pyrogram-patch/fsm" class="font-bold">Advanced FSM</A>: A professional state machine engine. Define conversational flows visually using <code>StatesGroup</code> classes and let the engine handle data persistence and cleanup.
-        </li>
-      </ul>
+<span class="cmt"># FSM</span>
+<span class="imp">from</span> pyrogram_patch.fsm <span class="imp">import</span> (
+    State, StatesGroup,              <span class="cmt"># State definitions</span>
+    FSMContext,                       <span class="cmt"># Runtime context</span>
+    MemoryStorage, RedisStorage,     <span class="cmt"># Storage backends</span>
+    StateFilter, AnyStateFilter,     <span class="cmt"># Filters</span>
+    NoStateFilter,
+)
 
-      <h2>One Patch, Infinite Possibilities</h2>
-      <p>
-        Integrating the patch into your existing bot requires exactly two lines of code. Once patched, the <code>PatchManager</code> becomes the central hub for registering your business logic.
-      </p>
+<span class="cmt"># Middleware</span>
+<span class="imp">from</span> pyrogram_patch.middlewares.rate_limit <span class="imp">import</span> RateLimitMiddleware
 
-      <CodeBlock
-          language="python"
-          filename="main.py"
-          code={`from pyrogram import Client
-from pyrogram_patch import patch
-from .handlers import registration_router
-from .middlewares import DatabaseSessionMiddleware
+<span class="cmt"># Helpers</span>
+<span class="imp">from</span> pyrogram_patch.patch_helper <span class="imp">import</span> PatchHelper`}
+        />
+      </section>
 
-async def main():
-    app = Client("my_bot")
-    
-    # 1. Apply the patch
-    manager = await patch(app)
-    
-    # 2. Register global Middlewares
-    await manager.include_middleware(DatabaseSessionMiddleware())
-    
-    # 3. Mount isolated Routers
-    manager.include_router(registration_router)
-    
-    await app.start()
-    await app.idle()`}
-      />
+      {/* Feature grid */}
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Features</h2>
+        <div class="grid sm:grid-cols-2 gap-3 stagger">
+          <Feature title="Patching" href="/pyrogram-patch/patching" desc="patch() / unpatch() lifecycle and PatchManager configuration" />
+          <Feature title="Router" href="/pyrogram-patch/router" desc="Hierarchical routers with 25+ event decorators and sub-router nesting" />
+          <Feature title="FSM" href="/pyrogram-patch/fsm" desc="State machines with state guards, transition validation, and filters" />
+          <Feature title="Storage" href="/pyrogram-patch/storage" desc="Pluggable backends: Memory, Redis (with circuit breaker), or custom" />
+          <Feature title="Middleware" href="/pyrogram-patch/middleware" desc="Tri-phase pipeline: before → around → handler → after" />
+          <Feature title="Patch Helper" href="/pyrogram-patch/patch-helper" desc="Dependency-injected helper with FSM, data access, and snapshots" />
+          <Feature title="Circuit Breaker" href="/pyrogram-patch/circuit-breaker" desc="Fault tolerance with automatic recovery for storage operations" />
+          <Feature title="Configuration" href="/pyrogram-patch/configuration" desc="Pydantic settings with environment variable support" />
+          <Feature title="Dispatcher" href="/pyrogram-patch/dispatcher" desc="PatchedDispatcher internals, middleware chain, and handler DI" />
+          <Feature title="Errors" href="/pyrogram-patch/errors" desc="15+ structured error types with TraceInfo and JSON serialization" />
+        </div>
+      </section>
 
-      <Callout type="info" title="Zero Overhead">
-        The patch is designed with extreme performance in mind. Middleware and router matching is heavily optimized to introduce near-zero nanosecond overhead compared to native Pyrogram dispatching.
-      </Callout>
+      {/* Minimal setup */}
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Minimal Setup</h2>
+        <CodeBlock
+          title="main.py"
+          code={`<span class="imp">import</span> asyncio
+<span class="imp">from</span> pyrogram <span class="imp">import</span> Client, idle
+<span class="imp">from</span> pyrogram_patch <span class="imp">import</span> patch
+<span class="imp">from</span> pyrogram_patch.router <span class="imp">import</span> Router
+<span class="imp">from</span> pyrogram_patch.fsm <span class="imp">import</span> MemoryStorage
 
-      <h2>Where to Start?</h2>
-      <p>
-        If you are building a bot that requires users to step through a multi-stage process (like ordering a product or registering an account), we highly recommend starting with the <A href="/pyrogram-patch/tutorial" class="font-bold">Stateful Wizard Tutorial</A>.
-      </p>
+app = Client(<span class="str">"my_bot"</span>)
+router = Router()
 
-    </div>
+<span class="cmt"># Register handlers on the router...</span>
+
+<span class="kw">async def</span> <span class="fn">main</span>():
+    manager = <span class="kw">await</span> patch(app)
+    manager.set_storage(MemoryStorage())  <span class="cmt"># or RedisStorage(redis_client)</span>
+    manager.include_router(router)
+
+    <span class="cmt"># Optionally add middleware</span>
+    <span class="kw">await</span> manager.add_middleware(my_logging_middleware, kind=<span class="str">"before"</span>)
+
+    <span class="kw">await</span> app.start()
+    <span class="kw">await</span> idle()
+
+asyncio.run(main())`}
+        />
+      </section>
+    </Layout>
+  );
+}
+
+function Feature(props: { title: string; href: string; desc: string }) {
+  return (
+    <A
+      href={props.href}
+      class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all duration-200 hover:-translate-y-0.5"
+      style={{ background: "var(--color-surface)" }}
+    >
+      <div class="font-semibold text-sm mb-1">{props.title}</div>
+      <div class="text-xs text-slate-500">{props.desc}</div>
+    </A>
   );
 }

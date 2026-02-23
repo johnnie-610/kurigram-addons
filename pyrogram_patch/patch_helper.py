@@ -76,7 +76,11 @@ async def create_key(parsed_update: Update, client: Client) -> str:
                 )
             user_id = str(user_id_raw)
         else:
-            raise ValueError("No user ID found in update")
+            raise errors.ValidationError(
+                field="user_id",
+                value=None,
+                expected="update with from_user or message.from_user",
+            )
 
     # Extract chat ID
     if hasattr(parsed_update, "chat") and parsed_update.chat is not None:
@@ -104,7 +108,11 @@ async def create_key(parsed_update: Update, client: Client) -> str:
                 )
             chat_id = str(chat_id_raw)
         else:
-            raise ValueError("No chat ID found in update")
+            raise errors.ValidationError(
+                field="chat_id",
+                value=None,
+                expected="update with chat or message.chat",
+            )
 
     return f"{client.me.id}-{user_id}-{chat_id}"
 
@@ -149,16 +157,16 @@ class PatchHelper:
     def storage(self) -> Optional[BaseStorage]:
         """Get the FSM storage instance."""
         if getattr(self, "_fsm_storage", None) is not None:
-            print("Using FSM storage")
+            logger.debug("Using FSM storage")
             return self._fsm_storage
         # Fallback to global pool
         try:
-             from .patch_data_pool import global_pool
-             if global_pool and getattr(global_pool, "_fsm_storage", None):
-                print("Using global pool FSM storage")
+            from .patch_data_pool import global_pool
+            if global_pool and getattr(global_pool, "_fsm_storage", None):
+                logger.debug("Using global pool FSM storage")
                 return global_pool._fsm_storage
         except ImportError:
-             pass
+            pass
         return None
 
 
@@ -356,30 +364,6 @@ class PatchHelper:
         """Get a value from the helper's data."""
         async with self._lock:
             return self._data.get(key, default)
-
-    def __getitem__(self, key: str) -> Any:
-        """Get an item from the helper's data."""
-        if key not in self._data:
-            raise KeyError(f"Key '{key}' not in helper data")
-        return self._data[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Set an item in the helper's data."""
-        self._data[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        """Delete an item from the helper's data."""
-        if key not in self._data:
-            raise KeyError(f"Key '{key}' not in helper data")
-        del self._data[key]
-
-    def __contains__(self, key: str) -> bool:
-        """Check if a key exists in the helper's data."""
-        return key in self._data
-
-    def __len__(self) -> int:
-        """Get the number of items in the helper's data."""
-        return len(self._data)
 
     def __repr__(self) -> str:
         """Get a string representation of the helper."""

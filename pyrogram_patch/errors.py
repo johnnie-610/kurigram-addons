@@ -25,7 +25,7 @@ import linecache
 import logging
 import traceback
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -125,6 +125,7 @@ class PyrogramPatchError(Exception):
         context: Optional[Dict[str, Any]] = None,
         trace: Optional[TraceInfo] = None,
         cause: Optional[BaseException] = None,
+        log_on_create: bool = True,
     ):
         super().__init__(message)
         self.message = message
@@ -133,11 +134,12 @@ class PyrogramPatchError(Exception):
         # if no trace supplied, capture caller frame
         self.trace = trace or capture_trace(skip=1)
         self.cause = cause
-        self.created_at = datetime.utcnow().isoformat() + "Z"
+        self.created_at = datetime.now(timezone.utc).isoformat()
         self.error_id = make_error_id(self.error_code, self.trace)
 
         # Log right away at appropriate level (subclasses may override)
-        logger.error(self.short_log_line())
+        if log_on_create:
+            logger.error(self.short_log_line())
 
     def to_dict(self) -> Dict[str, Any]:
         d = {
@@ -508,12 +510,14 @@ __all__ = [
     "LockError",
     "RedisStorageError",
     "FSMTransitionError",
+    "InvalidStateTransition",
     "MiddlewareError",
     "RouterError",
     "UpstreamCompatibilityError",
     "DeprecationNotice",
     "AsyncHandlerRequiredError",
     "HandlerRegistrationError",
+    "FSMContextError",
     "wrap_with_dispatcher_error",
     "wrap_with_patch_error",
     "wrap_with_redis_error",

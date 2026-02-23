@@ -1,6 +1,6 @@
 [project]
 name = "kurigram-addons"
-version = "0.3.6"
+version = "0.3.7"
 description = "A collection of useful addons for the Kurigram library"
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
@@ -8,7 +8,6 @@ license = "MIT"
 authors = [{ name = "Johnnie", email = "johnnie610@duck.com" }]
 keywords = ["kurigram", "addons", "pykeyboard", "pyrogram-patch"]
 
-# Poetry 2.0 uses this standard PEP 621 field for dependencies
 dependencies = [
     "kurigram>=2.1.35",
     "redis>=6.0.0",
@@ -16,24 +15,18 @@ dependencies = [
     "pydantic-settings>=2.10.1",
 ]
 
-# dynamic fields are calculated by Poetry (e.g., classifiers based on license/python version)
-dynamic = ["classifiers"]
-
 [project.urls]
 Repository = "https://github.com/johnnie-610/kurigram-addons"
 Issues = "https://github.com/johnnie-610/kurigram-addons/issues"
+Documentation = "https://johnnie-610.github.io/kurigram-addons/"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 # Tool Specific Configurations
-
 [tool.poetry]
 packages = [{ include = "pykeyboard" }, { include = "pyrogram_patch" }]
-
-[tool.poetry.group.dev.dependencies]
-pre-commit = "^4.2.0"
 
 # Testing
 pytest = "^7.4.0"

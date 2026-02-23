@@ -1,13 +1,14 @@
 <div align="center">
-  <h1>kurigram-addons</h1>
-  <p><em>Advanced enterprise-grade toolset for the Kurigram / Pyrogram ecosystem.</em></p>
-  <p>
-    <a href="https://pypi.org/project/kurigram-addons/"><img src="https://img.shields.io/pypi/v/kurigram-addons.svg" alt="PyPI" /></a>
-    <a href="https://github.com/johnnie-610/kurigram-addons"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
-  </p>
+    <img src="./logo.png" alt="kurigram-addons Logo" width="150"/>
+    <h1>kurigram-addons</h1>
+    <p><em>Advanced toolset for the Kurigram / Pyrogram ecosystem.</em></p>
+    <p>
+        <a href="https://pypi.org/project/kurigram-addons/"><img src="https://img.shields.io/pypi/v/kurigram-addons.svg" alt="PyPI" /></a>
+        <a href="https://pepy.tech/projects/kurigram-addons"><img src="https://static.pepy.tech/personalized-badge/kurigram-addons?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=BRIGHTGREEN&left_text=downloads" alt="PyPI Downloads"></a>
+        <a href="https://github.com/johnnie-610/kurigram-addons"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+        <a href="https://github.com/johnnie-610/kurigram-addons"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python" /></a>
+    </p>
 </div>
-
----
 
 **`kurigram-addons`** is a professional collection of utilities designed to dramatically enhance the development, maintainability, and scalability of Telegram bots built with [Kurigram](https://pypi.org/project/kurigram/).
 
@@ -43,7 +44,11 @@ A fully declarative UI manipulation framework that obliterates traditional boile
 pip install kurigram-addons
 ```
 
-> **Requirements**: Python 3.10+. Requires `kurigram` >= 2.1.35 (or a compatible Pyrogram distribution), `pydantic` >= 2.11, and `redis` >= 6.0.0.
+> **Requirements**: 
+- `Python` 3.10+,
+- `kurigram` >= 2.1.35 (or a compatible Pyrogram distribution),
+- `pydantic` >= 2.11,
+- `redis` >= 6.0.0.
 
 ## 🚀 Quickstarts
 

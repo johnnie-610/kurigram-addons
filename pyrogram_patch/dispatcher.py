@@ -76,7 +76,7 @@ class PatchedDispatcher(Dispatcher):
                 # check if middlewares exist.
                 
                 patch_helper: Optional[PatchHelper] = None
-                if self.pool._middleware_manager._middlewares:
+                if self.pool._middleware_manager.has_middlewares:
                     patch_helper = await self._prepare_patch_helper(
                         parsed_update, handler_type
                     )
@@ -173,7 +173,7 @@ class PatchedDispatcher(Dispatcher):
 
         # If there are global middlewares, the answer is always yes for now
         # because middlewares might need the helper/state.
-        if self.pool._middleware_manager._middlewares:
+        if self.pool._middleware_manager.has_middlewares:
             # We don't cache this strictly because middlewares might be added/removed
             # (though normally they are static after setup)
             return True

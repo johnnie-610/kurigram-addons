@@ -1,122 +1,74 @@
 import { Title } from "@solidjs/meta";
+import Layout from "~/components/Layout";
 import CodeBlock from "~/components/CodeBlock";
-import Callout from "~/components/Callout";
-import { A } from "@solidjs/router";
 
 export default function PaginationPage() {
   return (
-    <div class="pb-20">
-      <Title>Smart Pagination - PyKeyboard - Kurigram Addons</Title>
-
-      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-[10px] font-bold tracking-widest uppercase mb-4 not-prose">
-        Advanced UI
+    <Layout>
+      <Title>Pagination — kurigram-addons</Title>
+      <div class="animate-fade-in-up">
+        <h1 class="text-3xl font-bold mb-2">Pagination</h1>
+        <p class="text-slate-400 mb-8">Built-in pagination for inline keyboards with configurable navigation symbols, duplicate hash prevention, and page change detection.</p>
       </div>
-      
-      <h1>Smart Pagination</h1>
-      <p class="lead text-xl">
-        Handle massive lists with elegance. PyKeyboard's pagination engine features built-in LRU caching and duplicate prevention to ensure a fluid user experience even with thousands of items.
-      </p>
 
-      <h2>Quick Implementation</h2>
-      <p>
-        The <code>paginate()</code> method automatically calculates missing links and generates a responsive navigation row based on the total page count and the user's current position.
-      </p>
-      
-      <CodeBlock
-          language="python"
-          filename="pagination_basic.py"
-          code={`from pykeyboard import InlineKeyboard
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Basic Usage</h2>
+        <CodeBlock title="Paginated keyboard" code={`<span class="imp">from</span> pykeyboard <span class="imp">import</span> InlineKeyboard
 
-keyboard = InlineKeyboard()
-
-# Creates a row that looks like: « 1 ‹ 11 · 12 · 13 › 25 »
-keyboard.paginate(
-    count_pages=25,
-    current_page=12,
-    callback_pattern="page:{number}"
-)`}
-      />
-      
-      <Callout type="info" title="Dynamic Patterns">
-        The <code>{`{number}`}</code> placeholder in <code>callback_pattern</code> is required. It is automatically replaced by the library with the target page number when generating the buttons.
-      </Callout>
-
-      <h2>Core Mechanics</h2>
-      
-      <h3>LRU Caching</h3>
-      <p>
-        Pagination math can become expensive if you have a massive bot with hundreds of users querying data simultaneously. To mitigate this, PyKeyboard caches the last 1,000 generated pagination layouts using a Least Recently Used (LRU) algorithm. 
-      </p>
-      <p>
-        This ensures that identical pagination requests (e.g., page 5 of 10) are instantly retrieved from memory, providing a significant performance boost.
-      </p>
-
-      <h3>Duplicate Prevention</h3>
-      <p>
-        A common UX issue in Telegram bots is when a user aggressively taps the button for the page they are <strong>already on</strong>. When the bot attempts to edit the message with the exact same content, Telegram throws a <code>MessageNotModified</code> exception.
-      </p>
-      <p>
-        PyKeyboard detects if the requested page is identical to the current page natively and provides specific hooks to prevent unnecessary API calls.
-      </p>
-
-      <CodeBlock 
-          language="python"
-          filename="duplicates.py"
-          code={`from pykeyboard import PaginationUnchangedError
-
-@app.on_callback_query(filters.regex(r"^page:(\\d+)$"))
-async def handle_pagination(client, callback):
-    # Retrieve the requested page from the callback data
-    target_page = int(callback.matches[0].group(1))
-    
-    # Let's pretend we extracted the "current page" from the message text
-    current_page = 5 
-    
-    try:
-        kb = InlineKeyboard()
-        kb.paginate(count_pages=10, current_page=current_page, callback_pattern="page:{number}")
-        
-    except PaginationUnchangedError:
-        # The user clicked the page they are already on!
-        await callback.answer("You are already on this page! ℹ️")
-        return
-        
-    # Proceed to load data and edit the message...`}
-      />
-
-      <h2>Advanced Layouts</h2>
-      <p>
-        Pagination isn't limited to a single row. It's designed to compose seamlessly with the rest of the <code>InlineKeyboard</code> builder logic.
-      </p>
-
-      <CodeBlock 
-          language="python"
-          filename="advanced_layout.py"
-          code={`kb = InlineKeyboard(row_width=2)
-
-# Add your dynamic list of items first
-kb.add(
-    InlineButton("Item 1", "item:1"),
-    InlineButton("Item 2", "item:2")
+kb = InlineKeyboard()
+kb.paginate(
+    count_pages=<span class="num">10</span>,
+    current_page=<span class="num">3</span>,
+    callback_pattern=<span class="str">"page_{}"</span>,  <span class="cmt"># {} is replaced with page number</span>
 )
 
-# Append the pagination controls at the bottom
-kb.paginate(150, 75, 'page:{number}')
+<span class="cmt"># Produces: [« 1] [‹ 2] [· 3 ·] [4 ›] [10 »]</span>
+<span class="kw">await</span> message.reply(<span class="str">"Page 3 of 10"</span>, reply_markup=kb)`} />
+      </section>
 
-# You can even append standard action buttons below the pagination row
-kb.row(
-    InlineButton('🔙 Back to Menu', 'menu:main'),
-    InlineButton('❌ Close', 'action:close')
-)`}
-      />
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Parameters</h2>
+        <table>
+          <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>count_pages</code></td><td><code>int</code></td><td>Total number of pages</td></tr>
+            <tr><td><code>current_page</code></td><td><code>int</code></td><td>Currently active page (1-indexed)</td></tr>
+            <tr><td><code>callback_pattern</code></td><td><code>str</code></td><td>Pattern with <code>{"{}"}</code> placeholder for page number</td></tr>
+          </tbody>
+        </table>
+      </section>
 
-      <br />
-      <hr />
-      
-      <Callout type="info" title="Explore the Inner Workings">
-        Interested in how the math actually bounds the page links and caches instances? Check the <A class="font-bold" href="/api">API Reference</A> for the PaginationHelper class.
-      </Callout>
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Custom Symbols</h2>
+        <p class="text-sm text-slate-400 mb-4">Override the default navigation symbols:</p>
+        <CodeBlock code={`kb = InlineKeyboard()
+kb.PAGINATION_SYMBOLS = {
+    <span class="str">"first"</span>: <span class="str">"⏮ {}"</span>,
+    <span class="str">"prev"</span>: <span class="str">"◀ {}"</span>,
+    <span class="str">"current"</span>: <span class="str">"[{}]"</span>,
+    <span class="str">"next"</span>: <span class="str">"{} ▶"</span>,
+    <span class="str">"last"</span>: <span class="str">"{} ⏭"</span>,
+}
+kb.paginate(count_pages=<span class="num">5</span>, current_page=<span class="num">2</span>, callback_pattern=<span class="str">"p:{}"</span>)
 
-    </div>
+<span class="cmt"># Produces: [⏮ 1] [◀ 1] [[2]] [3 ▶] [5 ⏭]</span>`} />
+      </section>
+
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Duplicate Prevention</h2>
+        <p class="text-sm text-slate-400 mb-4">
+          Pagination uses SHA-256 hashing to detect when the user taps the current page button (no-op).
+          A <code>PaginationUnchangedError</code> is raised when the page hasn't changed,
+          which you can catch to avoid unnecessary edits.
+        </p>
+        <CodeBlock code={`<span class="imp">from</span> pykeyboard.errors <span class="imp">import</span> PaginationUnchangedError
+
+<span class="kw">try</span>:
+    kb.paginate(count_pages=<span class="num">5</span>, current_page=<span class="num">3</span>, callback_pattern=<span class="str">"p:{}"</span>)
+<span class="kw">except</span> PaginationUnchangedError:
+    <span class="cmt"># User tapped the current page — nothing to update</span>
+    <span class="kw">pass</span>`} />
+      </section>
+    </Layout>
   );
 }

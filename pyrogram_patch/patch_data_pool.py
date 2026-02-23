@@ -61,7 +61,9 @@ class PatchDataPool:
     """
 
     _instance: Optional["PatchDataPool"] = None
-    _init_lock: Optional[asyncio.Lock] = None
+    # Eagerly created to avoid race when two coroutines call get_instance()
+    # before any lock exists. asyncio.Lock() can be created outside an event loop.
+    _init_lock: asyncio.Lock = asyncio.Lock()
 
     # Class attributes for basic implementation compatibility
     pyrogram_patch_outer_middlewares: list = []
@@ -71,9 +73,6 @@ class PatchDataPool:
     @classmethod
     async def get_instance(cls) -> "PatchDataPool":
         """Async get the singleton instance."""
-        if cls._init_lock is None:
-            cls._init_lock = asyncio.Lock()
-            
         if cls._instance is None:
             async with cls._init_lock:
                 if cls._instance is None:
@@ -403,9 +402,7 @@ class PatchDataPool:
         Used during unpatch() to fully clean up the pool.
         """
         async with self._lock:
-            self._middleware_manager._middlewares.clear()
-            self._middleware_manager._listeners["startup"].clear()
-            self._middleware_manager._listeners["shutdown"].clear()
+            self._middleware_manager.clear()
             self._helpers.clear()
             self.__class__.pyrogram_patch_outer_middlewares.clear()
             self.__class__.pyrogram_patch_middlewares.clear()

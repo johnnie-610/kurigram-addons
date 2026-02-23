@@ -65,6 +65,21 @@ class MiddlewareManager:
             "shutdown": [],
         }
 
+    @property
+    def has_middlewares(self) -> bool:
+        """Whether any middlewares are registered."""
+        return bool(self._middlewares)
+
+    def clear(self) -> None:
+        """Reset all internal state: middlewares, caches, and listeners."""
+        self._middlewares.clear()
+        self._before.clear()
+        self._after.clear()
+        self._around.clear()
+        for listeners in self._listeners.values():
+            listeners.clear()
+        logger.info("MiddlewareManager cleared all state")
+
     async def add_listener(self, event: str, fn: Callable) -> None:
         """Register a lifecycle listener."""
         if event not in self._listeners:
@@ -223,6 +238,7 @@ class MiddlewareManager:
         for i, m in enumerate(self._middlewares):
             if m.id == mid:
                 self._middlewares.pop(i)
+                self._rebuild_cache()
                 logger.info("Removed middleware id=%s", mid)
                 return True
         return False

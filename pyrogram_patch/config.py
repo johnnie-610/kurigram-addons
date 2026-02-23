@@ -205,7 +205,6 @@ def print_env_vars() -> None:
             print(f"  {env_name}={default}  # {description}")
 
     print_config_section("Circuit Breaker", config.circuit_breaker)
-    print_config_section("Circuit Breaker", config.circuit_breaker)
     print_config_section("FSM", config.fsm)
     print_config_section("Storage", config.storage)
     print_config_section("Middleware", config.middleware)

@@ -8,10 +8,17 @@ export default createHandler(() => (
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+          <meta name="description" content="Modern Telegram bot toolkit for Kurigram/Pyrogram — declarative keyboards, FSM, middlewares, circuit breaker" />
+          <link rel="icon" href="/logo.png" />
+          <script>{`
+            (function() {
+              var t = localStorage.getItem('theme');
+              if (t === 'light') document.documentElement.classList.add('light-mode');
+            })();
+          `}</script>
           {assets}
         </head>
-        <body>
+        <body class="antialiased">
           <div id="app">{children}</div>
           {scripts}
         </body>

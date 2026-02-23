@@ -7,10 +7,8 @@
     "esModuleInterop": true,
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "allowJs": true,
-    "strict": true,
-    "noEmit": true,
     "types": ["vinxi/types/client"],
+    "noEmit": true,
     "isolatedModules": true,
     "paths": {
       "~/*": ["./src/*"]

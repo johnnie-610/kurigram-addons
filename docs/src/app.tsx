@@ -1,25 +1,20 @@
+// @refresh reload
+import { MetaProvider, Title } from "@solidjs/meta";
 import { Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { Suspense } from "solid-js";
-import { MetaProvider, Title } from "@solidjs/meta";
-import Layout from "./components/Layout";
 import "./app.css";
-import "prismjs/themes/prism-tomorrow.css";
 
 export default function App() {
-  const basePath = import.meta.env.PROD ? "/kurigram-addons" : "/";
-  
   return (
     <Router
-      base={basePath}
-      root={props => (
-      <MetaProvider>
-        <Title>Kurigram Addons</Title>
-        <Layout>
+      root={(props) => (
+        <MetaProvider>
+          <Title>kurigram-addons — Documentation</Title>
           <Suspense>{props.children}</Suspense>
-        </Layout>
-      </MetaProvider>
-    )}>
+        </MetaProvider>
+      )}
+    >
       <FileRoutes />
     </Router>
   );

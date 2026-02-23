@@ -158,6 +158,9 @@ class AsyncCircuitBreaker(Generic[T]):
                 # Your storage operations here
                 await storage.set_state(...)
         """
+        # Check state under lock, then release before yielding.
+        # _record_success/_record_failure acquire the lock internally,
+        # so we must NOT hold it across the yield.
         async with self._lock:
             if self.state == CircuitState.OPEN:
                 if await self._should_attempt_reset():
@@ -165,7 +168,7 @@ class AsyncCircuitBreaker(Generic[T]):
                     logger.info("Circuit breaker half-open - testing recovery")
                 else:
                     raise CircuitBreakerOpenException("Circuit breaker is open")
-
+        # Lock released here — safe to call _record_* which re-acquire it.
         try:
             yield
             await self._record_success()

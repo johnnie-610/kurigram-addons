@@ -7,18 +7,18 @@
 #
 # pykeyboard/keyboard_base.py
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional, Union
+from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pyrogram.types import (CallbackGame, InlineKeyboardButton, KeyboardButton,
                             LoginUrl, WebAppInfo)
 
 from pykeyboard.errors import ValidationError
 
-if TYPE_CHECKING:
-    pass
-
 logger = logging.getLogger("pykeyboard.keyboard_base")
+
+# Telegram API hard limits
+TELEGRAM_MAX_BUTTONS_PER_KEYBOARD = 100
 
 class KeyboardBase(BaseModel):
     """Base class for keyboard implementations with row-based layout.
@@ -62,6 +62,10 @@ class KeyboardBase(BaseModel):
         Args:
             *args: Variable number of buttons or button-like objects to add.
 
+        Raises:
+            ValidationError: If adding these buttons would exceed the Telegram
+                100-button limit per keyboard.
+
         Time complexity: O(n) where n is the number of buttons.
 
         Example:
@@ -70,7 +74,17 @@ class KeyboardBase(BaseModel):
             >>> keyboard.keyboard
             [['A', 'B'], ['C', 'D'], ['E']]
         """
-        # self.keyboard.clear()  <-- Removed to allow appending
+        current_count = sum(len(row) for row in self.keyboard)
+        if current_count + len(args) > TELEGRAM_MAX_BUTTONS_PER_KEYBOARD:
+            raise ValidationError(
+                field="keyboard",
+                value=current_count + len(args),
+                reason=(
+                    f"Adding {len(args)} buttons would exceed Telegram's "
+                    f"{TELEGRAM_MAX_BUTTONS_PER_KEYBOARD}-button limit "
+                    f"(current: {current_count})"
+                ),
+            )
         for i in range(0, len(args), self.row_width):
             row_slice = args[i : i + self.row_width]
             self.keyboard.append(
@@ -278,6 +292,26 @@ class InlineButton(Button):
     copy_text: Optional[str] = Field(
         default=None, description="Text to copy to clipboard"
     )
+
+    # Action fields that are mutually exclusive per Telegram API.
+    _ACTION_FIELDS = (
+        "callback_data", "url", "web_app", "login_url", "user_id",
+        "switch_inline_query", "switch_inline_query_current_chat",
+        "callback_game", "pay", "copy_text",
+    )
+
+    @model_validator(mode="after")
+    def _validate_single_action(self) -> "InlineButton":
+        """Telegram rejects buttons with more than one action field set."""
+        set_fields = [
+            f for f in self._ACTION_FIELDS if getattr(self, f, None) is not None
+        ]
+        if len(set_fields) > 1:
+            raise ValueError(
+                f"InlineButton may only have one action field, "
+                f"but got {len(set_fields)}: {', '.join(set_fields)}"
+            )
+        return self
 
     def to_pyrogram(self) -> InlineKeyboardButton:
         """Convert to Pyrogram InlineKeyboardButton.

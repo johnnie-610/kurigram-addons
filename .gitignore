@@ -114,6 +114,16 @@ venv.bak/
 .poetry-cache
 x.py
 pykeyboard docs/
+node_modules/
+docs/.output/
+.agent/
+.benchmarks/
+.pytest_cache/
+.editorconfig
+.gitattributes
+ERRORS.md
+GEMINI.md
+package.json
 
 # Update handlers
 update_handlers.py
