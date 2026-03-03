@@ -21,8 +21,8 @@ export default function Home() {
           <p class="text-lg sm:text-xl text-slate-400 max-w-2xl mb-8 leading-relaxed">
             A production-grade toolkit for building Telegram bots with
             <strong class="text-amber-400"> Kurigram/Pyrogram</strong>.
-            Declarative keyboards, finite state machines, hierarchical routing,
-            middleware pipelines, and circuit breaker resilience.
+            All-in-one client, declarative keyboards, conversations, lifecycle hooks,
+            FSM, middleware pipelines, and circuit breaker resilience.
           </p>
           <div class="flex flex-wrap gap-3 justify-center">
             <A
@@ -68,6 +68,18 @@ export default function Home() {
           title="Battle-Tested Errors"
           description="Rich structured error hierarchy with TraceInfo, JSON serialization, error IDs for log correlation, and wrap decorators for automatic error handling."
           href="/pyrogram-patch/errors"
+        />
+        <FeatureCard
+          icon="🤖"
+          title="KurigramClient"
+          description="Drop-in Client subclass with built-in middleware, FSM, routing, FloodWait handling, and lifecycle hooks — replaces the legacy patch() API."
+          href="/kurigram-addons/client"
+        />
+        <FeatureCard
+          icon="💬"
+          title="Conversations"
+          description="Class-based multi-step conversations with declarative state definitions, auto-registered handlers, and type-safe context passing."
+          href="/kurigram-addons/conversation"
         />
       </section>
 

@@ -261,7 +261,7 @@ class ReplyButton(Button):
         """
         pyrogram_button = self.to_pyrogram()
 
-        return pyrogram_button.write()
+        return pyrogram_button.write(client)
 
 
 class PyReplyKeyboardRemove(BaseModel):
@@ -379,8 +379,7 @@ def _add_serialization_methods(cls):
         """
         return self.model_dump_json()
 
-    @classmethod
-    def from_json(cls, json_str: str):
+    def from_json(cls_inner, json_str: str):
         """Create keyboard instance from JSON string.
 
         Deserializes a keyboard from a JSON string created by to_json().
@@ -399,7 +398,7 @@ def _add_serialization_methods(cls):
             >>> json_str = '{"keyboard":[["Yes","No"]]}'
             >>> keyboard = ReplyKeyboard.from_json(json_str)
         """
-        return cls.model_validate_json(json_str)
+        return cls_inner.model_validate_json(json_str)
 
     cls.to_json = to_json
     cls.from_json = classmethod(from_json)

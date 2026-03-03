@@ -73,6 +73,12 @@ app.run()`}
 
         <h3 class="text-lg font-medium mb-2 text-teal-400">set_storage(storage)</h3>
         <p class="text-slate-400 mb-4 text-sm">Set or replace the FSM storage backend.</p>
+
+        <h3 class="text-lg font-medium mb-2 text-teal-400">on_startup(func) <span class="text-xs text-slate-500">v0.4.1</span></h3>
+        <p class="text-slate-400 mb-4 text-sm">Decorator. Register an async callback to run after <code>start()</code>. See <a href="/kurigram-addons/lifecycle-hooks" class="text-amber-400 hover:underline">Lifecycle Hooks</a>.</p>
+
+        <h3 class="text-lg font-medium mb-2 text-teal-400">on_shutdown(func) <span class="text-xs text-slate-500">v0.4.1</span></h3>
+        <p class="text-slate-400 mb-4 text-sm">Decorator. Register an async callback to run before <code>stop()</code>. See <a href="/kurigram-addons/lifecycle-hooks" class="text-amber-400 hover:underline">Lifecycle Hooks</a>.</p>
       </section>
     </Layout>
   );

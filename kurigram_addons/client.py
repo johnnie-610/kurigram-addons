@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, TypeVar
 
 from pyrogram import Client
 
@@ -89,6 +89,10 @@ class KurigramClient(Client):
         # FloodWait config
         self.auto_flood_wait = auto_flood_wait
         self.max_flood_wait = max_flood_wait
+
+        # Lifecycle hooks
+        self._startup_hooks: List[Callable] = []
+        self._shutdown_hooks: List[Callable] = []
 
         logger.debug("KurigramClient '%s' created", name)
 
@@ -287,10 +291,26 @@ class KurigramClient(Client):
                 "KurigramClient initialization failed", cause=e
             ) from e
 
-        return await super().start(*args, **kwargs)
+        result = await super().start(*args, **kwargs)
+
+        # Execute startup hooks
+        for hook in self._startup_hooks:
+            try:
+                await hook()
+            except Exception:
+                logger.warning("Startup hook %r failed", hook, exc_info=True)
+
+        return result
 
     async def stop(self, *args: Any, **kwargs: Any) -> bool:
         """Stop the client and clean up kurigram resources."""
+        # Execute shutdown hooks before cleanup
+        for hook in self._shutdown_hooks:
+            try:
+                await hook()
+            except Exception:
+                logger.warning("Shutdown hook %r failed", hook, exc_info=True)
+
         try:
             result = await super().stop(*args, **kwargs)
         finally:
@@ -306,6 +326,44 @@ class KurigramClient(Client):
             logger.info("KurigramClient '%s' stopped", self.name)
 
         return result
+
+    # ── Lifecycle hook decorators ────────────────────────────────
+
+    def on_startup(self, func: Callable) -> Callable:
+        """Register an async function to run after the client starts.
+
+        Can be used as a decorator::
+
+            @app.on_startup
+            async def init_db():
+                await database.connect()
+
+        Args:
+            func: Async callable (no arguments).
+
+        Returns:
+            The original function (unmodified).
+        """
+        self._startup_hooks.append(func)
+        return func
+
+    def on_shutdown(self, func: Callable) -> Callable:
+        """Register an async function to run before the client stops.
+
+        Can be used as a decorator::
+
+            @app.on_shutdown
+            async def close_db():
+                await database.disconnect()
+
+        Args:
+            func: Async callable (no arguments).
+
+        Returns:
+            The original function (unmodified).
+        """
+        self._shutdown_hooks.append(func)
+        return func
 
     # ── Convenience properties ──────────────────────────────────
 

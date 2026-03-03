@@ -180,7 +180,9 @@ class ConversationState:
 
         The decorated function receives ``(self, ctx: ConversationContext)``.
         """
-        fn._conversation_hook = ("on_enter", self._name)
+        # Store a reference to this descriptor instance (not _name,
+        # which is None until __set_name__ is called by the metaclass).
+        fn._conversation_hook = ("on_enter", self)
         return fn
 
     def on_message(self, fn: Callable) -> Callable:
@@ -188,7 +190,7 @@ class ConversationState:
 
         The decorated function receives ``(self, ctx: ConversationContext)``.
         """
-        fn._conversation_hook = ("on_message", self._name)
+        fn._conversation_hook = ("on_message", self)
         return fn
 
     def on_callback(self, fn: Callable) -> Callable:
@@ -196,7 +198,7 @@ class ConversationState:
 
         The decorated function receives ``(self, ctx: ConversationContext)``.
         """
-        fn._conversation_hook = ("on_callback", self._name)
+        fn._conversation_hook = ("on_callback", self)
         return fn
 
     def __repr__(self) -> str:
@@ -248,6 +250,11 @@ class ConversationMeta(type):
                 f"{name}: one ConversationState must have initial=True"
             )
 
+        # Build a reverse map: descriptor id -> state name
+        descriptor_to_name: Dict[int, str] = {
+            id(sv): sn for sn, sv in states.items()
+        }
+
         # Collect hooks from methods
         hooks: Dict[str, Dict[str, str]] = {
             s: {} for s in states
@@ -256,20 +263,15 @@ class ConversationMeta(type):
         for attr_name, attr_value in namespace.items():
             hook_info = getattr(attr_value, "_conversation_hook", None)
             if hook_info:
-                hook_type, state_name = hook_info
-                if state_name is None:
-                    # Hook was registered before __set_name__ resolved
-                    # Find it by scanning
-                    for sn, sv in states.items():
-                        attr_hooks = [
-                            a
-                            for a in namespace.values()
-                            if getattr(a, "_conversation_hook", (None,))[1]
-                            == sn
-                        ]
-                        if attr_value in attr_hooks:
-                            state_name = sn
-                            break
+                hook_type, state_ref = hook_info
+                # state_ref is the ConversationState descriptor instance
+                if isinstance(state_ref, ConversationState):
+                    state_name = descriptor_to_name.get(id(state_ref))
+                elif isinstance(state_ref, str):
+                    # Legacy: direct string reference (fallback)
+                    state_name = state_ref
+                else:
+                    state_name = None
 
                 if state_name and state_name in hooks:
                     hooks[state_name][hook_type] = attr_name

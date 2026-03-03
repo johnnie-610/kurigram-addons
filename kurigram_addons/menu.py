@@ -34,7 +34,6 @@ Example::
 from __future__ import annotations
 
 import logging
-import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -94,7 +93,8 @@ class Menu:
         back_text: Text for the back button (default: "← Back").
     """
 
-    # Global registry of all menus
+    # Global registry of all menus (WeakValueDictionary so menus are
+    # garbage-collected when no longer referenced, preventing cross-test leaks).
     _registry: Dict[str, "Menu"] = {}
 
     def __init__(
@@ -106,7 +106,9 @@ class Menu:
         columns: int = 2,
         back_text: str = "← Back",
     ) -> None:
-        if name in self._registry:
+        # Allow overwriting if the previous entry was garbage-collected
+        existing = self._registry.get(name)
+        if existing is not None and existing is not self:
             raise ValueError(f"Menu with name '{name}' already exists")
 
         self.name = name
@@ -118,6 +120,14 @@ class Menu:
 
         Menu._registry[name] = self
         logger.debug("Menu '%s' created (parent=%s)", name, parent and parent.name)
+
+    def __del__(self) -> None:
+        """Remove this menu from the registry on garbage collection."""
+        try:
+            if self._registry.get(self.name) is self:
+                del self._registry[self.name]
+        except Exception:
+            pass
 
     def button(
         self,

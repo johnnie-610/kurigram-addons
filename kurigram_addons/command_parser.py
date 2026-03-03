@@ -35,7 +35,8 @@ from __future__ import annotations
 import inspect
 import logging
 import shlex
-from typing import Any, Callable, Dict, Optional, Tuple, Type, get_type_hints
+import typing
+from typing import Any, Callable, Dict, Optional, Tuple, Type, Union, get_type_hints
 
 logger = logging.getLogger("kurigram.command_parser")
 
@@ -46,6 +47,21 @@ _PARSEABLE_TYPES: Dict[Type, Callable[[str], Any]] = {
     str: str,
     bool: lambda s: s.lower() in ("true", "1", "yes", "on"),
 }
+
+
+def _unwrap_optional(tp: Type) -> Tuple[Type, bool]:
+    """Unwrap Optional[T] or Union[T, None] to (T, is_optional).
+
+    Returns:
+        Tuple of (inner_type, is_optional). If the type is not Optional,
+        returns (tp, False).
+    """
+    origin = getattr(tp, "__origin__", None)
+    if origin is Union:
+        args = [a for a in tp.__args__ if a is not type(None)]
+        if len(args) == 1:
+            return args[0], True
+    return tp, False
 
 
 class CommandParseError(Exception):
@@ -74,13 +90,14 @@ def parse_command(
     Args:
         text: Full message text (e.g. ``/ban 12345 spamming``).
         skip: Number of leading tokens to skip (default: 1 for the command itself).
-        **type_hints: Parameter name → type mapping.
+        **type_hints: Parameter name → type mapping.  All are treated
+            as required unless the type is ``Optional[T]``.
 
     Returns:
         Dictionary of parsed argument values.
 
     Raises:
-        CommandParseError: If parsing fails.
+        CommandParseError: If parsing fails or required arguments are missing.
     """
     try:
         parts = shlex.split(text)
@@ -89,19 +106,30 @@ def parse_command(
 
     args = parts[skip:]
     result: Dict[str, Any] = {}
+    command_name = parts[0] if parts else ""
 
-    for i, (name, target_type) in enumerate(type_hints.items()):
+    for i, (name, raw_type) in enumerate(type_hints.items()):
+        inner_type, is_optional = _unwrap_optional(raw_type)
+
         if i < len(args):
-            parser = _PARSEABLE_TYPES.get(target_type, target_type)
+            parser = _PARSEABLE_TYPES.get(inner_type, inner_type)
             try:
                 result[name] = parser(args[i])
             except (ValueError, TypeError) as e:
                 raise CommandParseError(
-                    f"Cannot parse '{args[i]}' as {target_type.__name__} "
+                    f"Cannot parse '{args[i]}' as {inner_type.__name__} "
                     f"for parameter '{name}'",
-                    command=parts[0] if parts else "",
+                    command=command_name,
                 ) from e
-        # Missing args left for default values
+        elif is_optional:
+            result[name] = None
+        else:
+            # Required argument is missing
+            raise CommandParseError(
+                f"Missing required argument '{name}' "
+                f"(expected {inner_type.__name__})",
+                command=command_name,
+            )
 
     return result
 

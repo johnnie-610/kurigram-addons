@@ -286,7 +286,7 @@ class InlineKeyboard(KeyboardBase):
         Returns:
             InlineButton: PyKeyboard button instance (fresh copy)
         """
-        return InlineButton(text=text, callback_data=callback_data).model_copy()
+        return InlineButton(text=text, callback_data=callback_data).model_copy(deep=True)
 
     def paginate(
         self,
@@ -612,6 +612,18 @@ class InlineKeyboard(KeyboardBase):
         self._update_keyboard()
 
 
+
+    def copy(self, deep: bool = True) -> "InlineKeyboard":
+        """Create a copy of this keyboard.
+
+        Args:
+            deep: If True (default), perform a deep copy.
+                  If False, perform a shallow copy.
+
+        Returns:
+            InlineKeyboard: A new keyboard instance with copied state.
+        """
+        return self.model_copy(deep=deep)
 
     def write(self, client: Any = None) -> Any:
         """Pyrogram serialization hook to allow passing this object directly as reply_markup."""

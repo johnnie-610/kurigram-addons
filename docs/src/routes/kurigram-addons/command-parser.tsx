@@ -53,10 +53,16 @@ router = Router()
               <tr class="border-b border-white/5"><td class="py-2"><code>int</code></td><td><code>int("123")</code> → 123</td></tr>
               <tr class="border-b border-white/5"><td class="py-2"><code>float</code></td><td><code>float("3.14")</code> → 3.14</td></tr>
               <tr class="border-b border-white/5"><td class="py-2"><code>str</code></td><td>Passed through as-is</td></tr>
-              <tr><td class="py-2"><code>bool</code></td><td><code>"true"</code>, <code>"1"</code>, <code>"yes"</code> → True</td></tr>
+              <tr class="border-b border-white/5"><td class="py-2"><code>bool</code></td><td><code>"true"</code>, <code>"1"</code>, <code>"yes"</code> → True</td></tr>
+              <tr><td class="py-2"><code>Optional[T]</code> <span class="text-xs text-slate-500">v0.4.1</span></td><td>Same as inner type <code>T</code>, but returns <code>None</code> if missing</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="text-slate-400 text-xs mt-4">
+          <strong>Note (v0.4.1):</strong> All type-hinted arguments are now <strong>required by default</strong>.
+          If a required argument is missing, <code>CommandParseError</code> is raised (previously it returned an empty dict).
+          Use <code>Optional[T]</code> to make a parameter truly optional.
+        </p>
       </section>
     </Layout>
   );

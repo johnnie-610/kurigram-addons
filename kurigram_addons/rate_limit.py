@@ -31,10 +31,14 @@ import asyncio
 import functools
 import logging
 import time
-from collections import defaultdict
+from collections import OrderedDict
 from typing import Any, Callable, Dict, Optional, Tuple
 
 logger = logging.getLogger("kurigram.rate_limit")
+
+# Limits for the bounded bucket store
+_MAX_BUCKETS = 10_000
+_CLEANUP_INTERVAL = 100  # clean every N consume calls
 
 
 class _TokenBucket:
@@ -82,6 +86,8 @@ class RateLimit:
         window: Time window in seconds (default: 60).
         message: Reply to send when rate-limited. Supports ``{remaining}``
                  placeholder for seconds remaining.
+        on_limited: Optional async callback ``(client, update, remaining)``
+                    called instead of the default reply when rate-limited.
         scope: ``'user'``, ``'chat'``, or ``'global'`` (auto-inferred
                from per_user/per_chat if not set).
     """
@@ -93,6 +99,7 @@ class RateLimit:
         *,
         window: float = 60,
         message: Optional[str] = None,
+        on_limited: Optional[Callable] = None,
         scope: Optional[str] = None,
     ) -> None:
         if per_user is None and per_chat is None:
@@ -102,6 +109,7 @@ class RateLimit:
         self.per_chat = per_chat
         self.window = window
         self.message = message or "Rate limited. Try again in {remaining}s."
+        self.on_limited = on_limited
 
         if scope:
             self.scope = scope
@@ -110,13 +118,47 @@ class RateLimit:
         else:
             self.scope = "chat"
 
-        # Buckets: key -> TokenBucket
-        self._buckets: Dict[str, _TokenBucket] = defaultdict(
-            lambda: _TokenBucket(
-                capacity=self.per_user or self.per_chat or 1,
-                window=self.window,
-            )
+        # Bounded buckets with LRU eviction and TTL cleanup
+        self._buckets: OrderedDict[str, _TokenBucket] = OrderedDict()
+        self._consume_count = 0
+        self._stale_ttl = self.window * 2  # evict after 2x the window
+
+    def _get_bucket(self, key: str) -> _TokenBucket:
+        """Get or create a bucket for the given key with LRU tracking."""
+        if key in self._buckets:
+            self._buckets.move_to_end(key)
+            return self._buckets[key]
+
+        # Create new bucket
+        bucket = _TokenBucket(
+            capacity=self.per_user or self.per_chat or 1,
+            window=self.window,
         )
+        self._buckets[key] = bucket
+
+        # Evict oldest if over capacity
+        while len(self._buckets) > _MAX_BUCKETS:
+            self._buckets.popitem(last=False)
+
+        # Periodically clean stale entries
+        self._consume_count += 1
+        if self._consume_count % _CLEANUP_INTERVAL == 0:
+            self._cleanup_stale()
+
+        return bucket
+
+    def _cleanup_stale(self) -> None:
+        """Remove buckets that haven't been used for stale_ttl seconds."""
+        now = time.monotonic()
+        stale_keys = [
+            k
+            for k, b in self._buckets.items()
+            if (now - b._last_refill) > self._stale_ttl
+        ]
+        for k in stale_keys:
+            del self._buckets[k]
+        if stale_keys:
+            logger.debug("Cleaned %d stale rate-limit buckets", len(stale_keys))
 
     def _get_key(self, update: Any) -> str:
         """Build a bucket key from the update."""
@@ -145,10 +187,17 @@ class RateLimit:
         @functools.wraps(func)
         async def wrapper(client: Any, update: Any, *args: Any, **kwargs: Any) -> Any:
             key = limiter._get_key(update)
-            allowed, remaining = limiter._buckets[key].consume()
+            bucket = limiter._get_bucket(key)
+            allowed, remaining = bucket.consume()
 
             if not allowed:
                 remaining_int = int(remaining) + 1
+
+                # Use on_limited callback if provided
+                if limiter.on_limited:
+                    await limiter.on_limited(client, update, remaining_int)
+                    return None
+
                 reply_text = limiter.message.format(remaining=remaining_int)
 
                 # Try to reply
@@ -174,3 +223,4 @@ class RateLimit:
 
 
 __all__ = ["RateLimit"]
+

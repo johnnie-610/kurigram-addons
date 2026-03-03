@@ -59,6 +59,7 @@ app.include_menus(main_menu, profile_menu)`}
           <li><strong>Edit-in-place</strong> — navigation uses <code>edit_message_text</code> for smooth transitions.</li>
           <li><strong>Global registry</strong> — <code>Menu.get("name")</code> looks up any registered menu.</li>
           <li><strong>send() / edit()</strong> — display a menu programmatically from any handler.</li>
+          <li><strong>Auto-cleanup (v0.4.1)</strong> — menus are removed from the registry on garbage collection, preventing cross-test leaks.</li>
         </ul>
       </section>
     </Layout>

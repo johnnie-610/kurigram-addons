@@ -17,13 +17,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./docs
     steps:
-      - name: Checkout
+      - name: Checkout (current / v0.4.x)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history to also checkout v0.3.x
 
+      # ── Build v0.4.x docs ────────────────────────────────────
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -31,24 +31,120 @@ jobs:
           cache: "npm"
           cache-dependency-path: docs/package-lock.json
 
-      - name: Install dependencies
+      - name: Install v0.4.x dependencies
+        working-directory: ./docs
         run: npm ci
 
-      - name: Build
+      - name: Build v0.4.x docs
+        working-directory: ./docs
+        run: npm run build
+        env:
+          BASE_URL: /kurigram-addons/v0.4
+
+      - name: Stage v0.4.x output
+        run: |
+          mkdir -p _site/v0.4
+          cp -r docs/.output/public/* _site/v0.4/
+
+      # ── Build v0.3.x docs (from v0.3.7 commit) ──────────────
+      - name: Checkout v0.3.x docs source
+        run: |
+          # cacae1e = v0.3.7 release commit
+          git checkout cacae1e -- docs/
+
+      - name: Patch v0.3.x version switcher
+        run: |
+          # Replace the old VERSIONS array with one that links to v0.4.x
+          node -e "
+          const fs = require('fs');
+          const file = 'docs/src/components/Sidebar.tsx';
+          let src = fs.readFileSync(file, 'utf8');
+
+          // Replace VERSIONS array
+          src = src.replace(
+            /const VERSIONS = \[[\s\S]*?\];/,
+            \`const VERSIONS = [
+            { label: \"v0.4.1 (latest)\", path: \"/kurigram-addons/v0.4/\" },
+            { label: \"v0.3.x\", path: \"/kurigram-addons/\" },
+          ];\`
+          );
+
+          // Replace currentVersion to use path matching
+          src = src.replace(
+            /const currentVersion = \(\) => VERSIONS\.find\(\(v\) => v\.latest\)!;/,
+            \`const currentVersion = () => {
+              if (typeof window === 'undefined') return VERSIONS[1];
+              const p = window.location.pathname;
+              return VERSIONS.find(v => p.startsWith(v.path)) || VERSIONS[1];
+            };\`
+          );
+
+          // Replace the button-based dropdown with anchor links
+          src = src.replace(
+            /<For each=\{VERSIONS\}>[\s\S]*?<\/For>/,
+            \`<For each={VERSIONS}>
+                {(ver) => (
+                  <a
+                    href={ver.path}
+                    class=\"block w-full text-left px-3 py-1.5 text-[0.7rem] font-mono transition-colors\"
+                    classList={{
+                      \"text-amber-400 bg-amber-500/10\": ver.path === currentVersion().path,
+                      \"text-slate-400 hover:text-amber-300 hover:bg-white/5\": ver.path !== currentVersion().path,
+                    }}
+                  >
+                    {ver.label}
+                  </a>
+                )}
+              </For>\`
+          );
+
+          fs.writeFileSync(file, src);
+          console.log('✅ Patched v0.3.x Sidebar.tsx with v0.4.x version switcher');
+          "
+
+      - name: Install v0.3.x dependencies
+        working-directory: ./docs
+        run: npm ci
+
+      - name: Build v0.3.x docs
+        working-directory: ./docs
         run: npm run build
         env:
           BASE_URL: /kurigram-addons
 
-      - name: Add .nojekyll
-        run: touch .output/public/.nojekyll
+      - name: Stage v0.3.x output (root level)
+        run: |
+          # Copy v0.3.x files to site root, but do NOT overwrite the v0.4/ directory
+          cp -rn docs/.output/public/* _site/ || true
 
-      - name: SPA fallback for client-side routing
-        run: cp .output/public/index.html .output/public/404.html
+      # ── Root redirect + finalization ─────────────────────────
+      - name: Add root redirect to latest
+        run: |
+          cat > _site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta http-equiv="refresh" content="0; url=/kurigram-addons/v0.4/" />
+            <link rel="canonical" href="/kurigram-addons/v0.4/" />
+            <title>Redirecting…</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="/kurigram-addons/v0.4/">latest documentation</a>…</p>
+          </body>
+          </html>
+          EOF
+
+      - name: Add .nojekyll
+        run: touch _site/.nojekyll
+
+      - name: SPA fallback for v0.4.x
+        run: cp _site/v0.4/index.html _site/v0.4/404.html || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs/.output/public
+          path: ./_site
 
   deploy:
     environment:

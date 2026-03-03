@@ -36,7 +36,13 @@ class CircuitState(Enum):
 
 @dataclass
 class CircuitBreakerConfig:
-    """Configuration for circuit breaker behavior."""
+    """Configuration for circuit breaker behavior.
+
+    Note:
+        For new code, prefer using ``pyrogram_patch.config.CircuitBreakerConfig``
+        (Pydantic settings) which supports environment variable loading.
+        This dataclass is kept for backwards compatibility.
+    """
 
     failure_threshold: int = 5  # Failures before opening
     recovery_timeout: float = 60.0  # Seconds to wait before trying again
@@ -62,7 +68,18 @@ class AsyncCircuitBreaker(Generic[T]):
     """
 
     def __init__(self, config: Optional[CircuitBreakerConfig] = None):
-        self.config = config or CircuitBreakerConfig()
+        # Accept Pydantic CircuitBreakerConfig from config.py or local dataclass
+        if config is None:
+            config = CircuitBreakerConfig()
+        elif hasattr(config, 'model_fields'):
+            # Pydantic model — extract fields to local dataclass for consistency
+            config = CircuitBreakerConfig(
+                failure_threshold=config.failure_threshold,
+                recovery_timeout=config.recovery_timeout,
+                success_threshold=config.success_threshold,
+                timeout=config.timeout,
+            )
+        self.config = config
         self.state = CircuitState.CLOSED
         self.failure_count = 0
         self.success_count = 0

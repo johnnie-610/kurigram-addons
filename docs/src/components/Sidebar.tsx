@@ -16,40 +16,36 @@ const NAV: NavItem[] = [
     children: [
       { title: "Overview", href: "/kurigram-addons" },
       { title: "KurigramClient", href: "/kurigram-addons/client" },
-      { title: "Conversation Handler", href: "/kurigram-addons/conversation" },
-      { title: "Menu System", href: "/kurigram-addons/menu" },
-      { title: "Dependency Injection", href: "/kurigram-addons/depends" },
-      { title: "Rate Limiting", href: "/kurigram-addons/rate-limit" },
-      { title: "Command Parser", href: "/kurigram-addons/command-parser" },
-      { title: "Auto FloodWait", href: "/kurigram-addons/flood-wait" },
-    ],
-  },
-  {
-    title: "PyKeyboard",
-    children: [
-      { title: "Overview", href: "/pykeyboard" },
-      { title: "Inline Keyboard", href: "/pykeyboard/inline-keyboard" },
-      { title: "Reply Keyboard", href: "/pykeyboard/reply-keyboard" },
-      { title: "Pagination", href: "/pykeyboard/pagination" },
-      { title: "Language Selection", href: "/pykeyboard/languages" },
-      { title: "Builder API", href: "/pykeyboard/builder" },
-      { title: "Factory Presets", href: "/pykeyboard/factory" },
-      { title: "Validation & Hooks", href: "/pykeyboard/hooks" },
-      { title: "Utilities", href: "/pykeyboard/utilities" },
-    ],
-  },
-  {
-    title: "Pyrogram Patch",
-    children: [
-      { title: "Overview", href: "/pyrogram-patch" },
-      { title: "Patching", href: "/pyrogram-patch/patching" },
-      { title: "Router", href: "/pyrogram-patch/router" },
+      { title: "Lifecycle Hooks", href: "/kurigram-addons/lifecycle-hooks" },
       {
-        title: "FSM",
+        title: "Keyboards",
         children: [
-          { title: "Overview", href: "/pyrogram-patch/fsm" },
+          { title: "Inline Keyboard", href: "/pykeyboard/inline-keyboard" },
+          { title: "Reply Keyboard", href: "/pykeyboard/reply-keyboard" },
+          { title: "Pagination", href: "/pykeyboard/pagination" },
+          { title: "Language Selection", href: "/pykeyboard/languages" },
+          { title: "Builder API", href: "/pykeyboard/builder" },
+          { title: "Factory Presets", href: "/pykeyboard/factory" },
+          { title: "Validation & Hooks", href: "/pykeyboard/hooks" },
+          { title: "Utilities", href: "/pykeyboard/utilities" },
+        ],
+      },
+      {
+        title: "Routing & FSM",
+        children: [
+          { title: "Router", href: "/pyrogram-patch/router" },
           { title: "States & Transitions", href: "/pyrogram-patch/fsm/states" },
           { title: "Filters", href: "/pyrogram-patch/fsm/filters" },
+          { title: "Conversation Handler", href: "/kurigram-addons/conversation" },
+        ],
+      },
+      {
+        title: "Middleware",
+        children: [
+          { title: "Overview", href: "/pyrogram-patch/middleware" },
+          { title: "Writing Middleware", href: "/pyrogram-patch/middleware/writing" },
+          { title: "Rate Limiting (middleware)", href: "/pyrogram-patch/middleware/rate-limit" },
+          { title: "FSM Injection", href: "/pyrogram-patch/middleware/fsm-inject" },
         ],
       },
       {
@@ -62,20 +58,21 @@ const NAV: NavItem[] = [
         ],
       },
       {
-        title: "Middleware",
+        title: "Utilities",
         children: [
-          { title: "Overview", href: "/pyrogram-patch/middleware" },
-          { title: "Writing Middleware", href: "/pyrogram-patch/middleware/writing" },
-          { title: "Rate Limiting", href: "/pyrogram-patch/middleware/rate-limit" },
-          { title: "FSM Injection", href: "/pyrogram-patch/middleware/fsm-inject" },
+          { title: "Menu System", href: "/kurigram-addons/menu" },
+          { title: "Dependency Injection", href: "/kurigram-addons/depends" },
+          { title: "Command Parser", href: "/kurigram-addons/command-parser" },
+          { title: "Rate Limiting", href: "/kurigram-addons/rate-limit" },
+          { title: "Auto FloodWait", href: "/kurigram-addons/flood-wait" },
+          { title: "Circuit Breaker", href: "/pyrogram-patch/circuit-breaker" },
         ],
       },
-      { title: "Patch Helper", href: "/pyrogram-patch/patch-helper" },
-      { title: "Circuit Breaker", href: "/pyrogram-patch/circuit-breaker" },
       { title: "Configuration", href: "/pyrogram-patch/configuration" },
-      { title: "Errors", href: "/pyrogram-patch/errors" },
+      { title: "Error Handling", href: "/pyrogram-patch/errors" },
     ],
   },
+  { title: "Migration from v0.3.x", href: "/migration" },
   {
     title: "API Reference",
     children: [
@@ -179,13 +176,34 @@ function NavGroup(props: { item: NavItem; depth: number }) {
 
 /** Available documentation versions */
 const VERSIONS = [
-  { label: "v0.3.7 (latest)", value: "0.3.7", latest: true },
-  { label: "v0.3.6", value: "0.3.6", latest: false },
+  { label: "v0.4.1 (latest)", path: "/kurigram-addons/v0.4/" },
+  { label: "v0.3.x", path: "/kurigram-addons/" },
 ];
 
 export default function Sidebar(props: { mobile?: boolean; onClose?: () => void }) {
   const [versionOpen, setVersionOpen] = createSignal(false);
-  const currentVersion = () => VERSIONS.find((v) => v.latest)!;
+  
+  // Detect current version from URL
+  const currentVersion = () => {
+    if (typeof window === "undefined") return VERSIONS[0];
+    const path = window.location.pathname;
+    const match = VERSIONS.find(v => path.includes(v.path));
+    return match || VERSIONS[0];
+  };
+
+  const switchVersion = (path: string) => {
+    setVersionOpen(false);
+    // If we are on localhost, we might need to strip the repo name
+    // but on GH Pages, the absolute path from root is standard.
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      // Local dev usually serves at root /
+      // Strip /kurigram-addons prefix if it exists in the target path
+      const localPath = path.replace("/kurigram-addons", "") || "/";
+      window.location.href = localPath;
+    } else {
+      window.location.href = path;
+    }
+  };
 
   return (
     <nav
@@ -194,7 +212,11 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
     >
       {/* Logo */}
       <div class="flex items-center gap-3 px-3 pb-2 border-b border-white/10">
-        <img src={`${import.meta.env.BASE_URL}logo.png`} alt="kurigram-addons" class="w-8 h-8 rounded-lg" />
+        <img 
+          src={`${(import.meta.env.BASE_URL || "").replace(/\/$/, "")}/logo.png`} 
+          alt="kurigram-addons" 
+          class="w-8 h-8 rounded-lg shadow-lg shadow-amber-500/10" 
+        />
         <div class="flex-1">
           <div class="font-bold text-sm text-amber-400">kurigram-addons</div>
           <div class="text-[0.65rem] text-slate-500">Documentation</div>
@@ -221,23 +243,29 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
         </button>
 
         <Show when={versionOpen()}>
-          <div class="absolute left-3 right-3 mt-1 rounded-lg border border-white/10 bg-[var(--bg-primary)] shadow-xl z-50 overflow-hidden">
+            <div class="absolute left-3 right-3 mt-1 rounded-lg border border-white/10 bg-[var(--bg-primary)] shadow-xl z-50 overflow-hidden">
             <For each={VERSIONS}>
-              {(ver) => (
-                <button
-                  class="w-full text-left px-3 py-1.5 text-[0.7rem] font-mono transition-colors"
-                  classList={{
-                    "text-amber-400 bg-amber-500/10": ver.latest,
-                    "text-slate-400 hover:text-amber-300 hover:bg-white/5": !ver.latest,
-                  }}
-                  onClick={() => {
-                    // Future: navigate to versioned docs path
-                    setVersionOpen(false);
-                  }}
-                >
-                  {ver.label}
-                </button>
-              )}
+              {(ver) => {
+                const isCurrent = ver.path === currentVersion().path;
+                // For local dev, link old versions to live site
+                const targetPath = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && ver.path === "/kurigram-addons/"
+                  ? `https://johnnie-610.github.io${ver.path}`
+                  : ver.path;
+
+                return (
+                  <a
+                    href={targetPath}
+                    onClick={() => setVersionOpen(false)}
+                    class="block w-full text-left px-3 py-1.5 text-[0.7rem] font-mono transition-colors"
+                    classList={{
+                      "text-amber-400 bg-amber-500/10": isCurrent,
+                      "text-slate-400 hover:text-amber-300 hover:bg-white/5": !isCurrent,
+                    }}
+                  >
+                    {ver.label}
+                  </a>
+                );
+              }}
             </For>
           </div>
         </Show>

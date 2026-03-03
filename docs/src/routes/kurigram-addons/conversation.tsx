@@ -57,6 +57,10 @@ export default function ConversationPage() {
           <li><code>@state.on_message</code> — called when a message arrives while in this state</li>
           <li><code>@state.on_callback</code> — called when a callback query arrives while in this state</li>
         </ul>
+        <p class="text-slate-400 text-xs mb-4">
+          <strong>v0.4.1:</strong> Hook decorators now use descriptor identity for reliable state resolution,
+          fixing an issue where <code>_name</code> was <code>None</code> at decoration time.
+        </p>
 
         <h3 class="text-lg font-medium mb-2 text-teal-400">ConversationContext</h3>
         <p class="text-slate-400 mb-3 text-sm">
