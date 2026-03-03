@@ -114,32 +114,20 @@ jobs:
 
       - name: Stage v0.3.x output (root level)
         run: |
-          # Copy v0.3.x files to site root, but do NOT overwrite the v0.4/ directory
-          cp -rn docs/.output/public/* _site/ || true
+          # Copy v0.3.x files to site root — skip the v0.4/ directory
+          rsync -a --exclude='v0.4' docs/.output/public/ _site/
 
-      # ── Root redirect + finalization ─────────────────────────
-      - name: Add root redirect to latest
-        run: |
-          cat > _site/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8" />
-            <meta http-equiv="refresh" content="0; url=/kurigram-addons/v0.4/" />
-            <link rel="canonical" href="/kurigram-addons/v0.4/" />
-            <title>Redirecting…</title>
-          </head>
-          <body>
-            <p>Redirecting to <a href="/kurigram-addons/v0.4/">latest documentation</a>…</p>
-          </body>
-          </html>
-          EOF
-
+      # ── Finalization ─────────────────────────────────────────
       - name: Add .nojekyll
         run: touch _site/.nojekyll
 
       - name: SPA fallback for v0.4.x
         run: cp _site/v0.4/index.html _site/v0.4/404.html || true
+
+      - name: SPA fallback for v0.3.x
+        run: |
+          # Only create 404.html if it doesn't already exist
+          [ -f _site/404.html ] || cp _site/index.html _site/404.html || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

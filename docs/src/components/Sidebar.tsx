@@ -82,16 +82,25 @@ const NAV: NavItem[] = [
   },
 ];
 
+/** Strip the Vite base URL so NAV hrefs (e.g. "/pyrogram-patch/router") match */
+function stripBase(pathname: string): string {
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  return base && pathname.startsWith(base)
+    ? pathname.slice(base.length) || "/"
+    : pathname;
+}
+
 /** Check if any child (recursively) matches the current path */
 function hasActiveChild(items: NavItem[], pathname: string): boolean {
+  const p = stripBase(pathname);
   return items.some(
-    (c) => c.href === pathname || (c.children && hasActiveChild(c.children, pathname))
+    (c) => c.href === p || (c.children && hasActiveChild(c.children, pathname))
   );
 }
 
 function NavLink(props: { item: NavItem; depth: number }) {
   const location = useLocation();
-  const isActive = () => location.pathname === props.item.href;
+  const isActive = () => stripBase(location.pathname) === props.item.href;
 
   return (
     <A

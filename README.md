@@ -10,20 +10,18 @@
     </p>
 </div>
 
-**`kurigram-addons`** is a professional toolkit for building production Telegram bots with [Kurigram](https://pypi.org/project/kurigram/). It provides a `Client` subclass, declarative FSM conversations, a menu system, dependency injection, rate limiting, and a powerful keyboard framework.
+**`kurigram-addons`** is a professional toolkit for building production Telegram bots with [Kurigram](https://pypi.org/project/kurigram/). It provides a `Client` subclass, declarative FSM conversations, a menu system, dependency injection, rate limiting, lifecycle hooks, and a powerful keyboard framework.
 
-> 📚 **[Official Documentation →](https://johnnie-610.github.io/kurigram-addons/)**
+> 📚 **[Documentation (v0.4.x) →](https://johnnie-610.github.io/kurigram-addons/v0.4/)**
+> 📖 **[Documentation (v0.3.x) →](https://johnnie-610.github.io/kurigram-addons/)**
 
-## ✨ What's New in v0.4.0
+## ✨ What's New in v0.4.1
 
-- **`KurigramClient`** — drop-in `Client` subclass that replaces `patch()`. Middleware, FSM, and routing built in.
-- **`Conversation` handler** — class-based multi-step flows with state descriptors.
-- **Menu system** — declarative menus with auto back-button and edit-in-place navigation.
-- **`Depends()`** — FastAPI-style dependency injection for handlers.
-- **`RateLimit`** — per-user / per-chat token-bucket rate limiter.
-- **`parse_command`** — typed `/command arg1 arg2` argument parsing.
-- **Router shortcuts** — `@router.on_callback("data")`, `@router.on_command("cmd")`.
-- **`InlineKeyboard.button()`** — keyboard-router integration.
+- **Lifecycle hooks** — `@app.on_startup` / `@app.on_shutdown` for async init/teardown.
+- **`RateLimit.on_limited`** — custom async callback when rate limit is hit.
+- **`Optional[T]` support** — `parse_command` now supports optional parameters.
+- **Required arg enforcement** — `parse_command` raises `CommandParseError` on missing args.
+- **Bug fixes** — menu registry leak, rate-limit memory leak, keyboard cache poisoning, ConversationState hook resolution, and more.
 
 See the full [CHANGELOG](./CHANGELOG.md) for details.
 
@@ -80,6 +78,20 @@ app = KurigramClient(
 app.include_router(router)
 app.include_conversation(Registration)
 app.include_menus(main_menu, settings_menu)
+```
+
+### Lifecycle Hooks
+
+Run async setup/teardown around the client lifecycle:
+
+```python
+@app.on_startup
+async def init_db():
+    await database.connect()
+
+@app.on_shutdown
+async def close_db():
+    await database.disconnect()
 ```
 
 ### Conversation Handler
@@ -151,31 +163,41 @@ from kurigram_addons import RateLimit
 @RateLimit(per_user=3, window=60, message="Slow down! {remaining}s left.")
 async def generate(client, message):
     await message.reply("Generating...")
+
+# Custom handler (v0.4.1)
+async def on_limited(client, update, remaining):
+    await update.reply(f"⏳ Wait {remaining}s")
+
+@RateLimit(per_user=3, window=60, on_limited=on_limited)
 ```
 
 ### Command Parser
 
 ```python
 from kurigram_addons import parse_command
+from typing import Optional
 
 @router.on_command("ban")
 async def ban(client, message):
-    args = parse_command(message.text, user_id=int, reason=str)
-    # /ban 12345 spamming → {"user_id": 12345, "reason": "spamming"}
+    args = parse_command(message.text, user_id=int, reason=Optional[str])
+    # /ban 12345        → {"user_id": 12345, "reason": None}
+    # /ban 12345 spam   → {"user_id": 12345, "reason": "spam"}
 ```
 
 ## 🏗️ Legacy Support
 
-Old imports still work but emit deprecation warnings:
+Old imports still work for backward compatibility:
 
 ```python
-# ⚠️ Deprecated (still works, warns)
+# ⚠️ Legacy (still works)
 from pykeyboard import InlineKeyboard
 from pyrogram_patch import patch
 
 # ✅ Recommended
 from kurigram_addons import InlineKeyboard, KurigramClient
 ```
+
+> See the [Migration Guide](https://johnnie-610.github.io/kurigram-addons/v0.4/migration) for full details.
 
 ## 🤝 Contributing
 
