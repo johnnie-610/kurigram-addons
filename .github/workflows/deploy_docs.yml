@@ -102,6 +102,25 @@ jobs:
           console.log('✅ Patched v0.3.x Sidebar.tsx with v0.4.x version switcher');
           "
 
+      - name: Patch v0.3.x app.config.ts (add BASE_URL support)
+        run: |
+          cat > docs/app.config.ts << 'CONF'
+          import { defineConfig } from "@solidjs/start/config";
+          import tailwindcss from "@tailwindcss/vite";
+
+          const base = process.env.BASE_URL || "/";
+
+          export default defineConfig({
+            ssr: false,
+            server: { baseURL: base },
+            vite: {
+              base,
+              plugins: [tailwindcss()],
+            },
+          });
+          CONF
+          echo "✅ Patched v0.3.x app.config.ts with BASE_URL=${BASE_URL}"
+
       - name: Install v0.3.x dependencies
         working-directory: ./docs
         run: npm ci
