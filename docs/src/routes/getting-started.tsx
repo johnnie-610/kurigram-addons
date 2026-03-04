@@ -1,6 +1,7 @@
 import { Title } from "@solidjs/meta";
 import Layout from "~/components/Layout";
 import CodeBlock from "~/components/CodeBlock";
+import { A } from "@solidjs/router";
 
 export default function GettingStarted() {
   return (
@@ -37,97 +38,87 @@ export default function GettingStarted() {
         </p>
         <CodeBlock
           title="main.py"
-          code={`<span class="imp">from</span> pyrogram <span class="imp">import</span> Client, filters
-<span class="imp">from</span> pykeyboard <span class="imp">import</span> InlineKeyboard, InlineButton
+          code={`<span class="imp">from</span> kurigram_addons <span class="imp">import</span> KurigramClient, Router, InlineKeyboard, MemoryStorage
 
-app = Client(<span class="str">"my_bot"</span>)
+router = Router()
 
-<span class="dec">@app.on_message</span>(filters.command(<span class="str">"start"</span>))
+<span class="dec">@router.on_command</span>(<span class="str">"start"</span>)
 <span class="kw">async def</span> <span class="fn">start</span>(client, message):
     kb = InlineKeyboard(row_width=<span class="num">2</span>)
-    kb.add(
-        InlineButton(text=<span class="str">"🔍 Search"</span>, callback_data=<span class="str">"search"</span>),
-        InlineButton(text=<span class="str">"⚙️ Settings"</span>, callback_data=<span class="str">"settings"</span>),
-        InlineButton(text=<span class="str">"📖 Help"</span>, callback_data=<span class="str">"help"</span>),
-    )
+    kb.button(<span class="str">"🔍 Search"</span>, callback=<span class="str">"search"</span>)
+    kb.button(<span class="str">"⚙️ Settings"</span>, callback=<span class="str">"settings"</span>)
+    kb.button(<span class="str">"📖 Help"</span>, callback=<span class="str">"help"</span>)
     <span class="kw">await</span> message.reply(<span class="str">"Welcome! Choose an option:"</span>, reply_markup=kb)
 
+app = KurigramClient(
+    <span class="str">"my_bot"</span>,
+    bot_token=<span class="str">"YOUR_TOKEN"</span>,
+    storage=MemoryStorage(),
+    auto_flood_wait=<span class="num">True</span>,
+)
+app.include_router(router)
 app.run()`}
         />
       </section>
 
-      {/* With Pyrogram Patch */}
+      {/* Lifecycle Hooks */}
       <section class="mb-10 reveal">
-        <h2 class="text-xl font-semibold mb-4 text-amber-400">Adding Pyrogram Patch</h2>
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Lifecycle Hooks</h2>
         <p class="text-slate-400 mb-4 text-sm">
-          Enable routers, FSM, and middleware by patching the client.
+          Run async setup/teardown around the client lifecycle — connect databases, warm caches, etc.
         </p>
         <CodeBlock
-          title="main.py"
-          code={`<span class="imp">import</span> asyncio
-<span class="imp">from</span> pyrogram <span class="imp">import</span> Client, filters
-<span class="imp">from</span> pyrogram <span class="imp">import</span> idle
-<span class="imp">from</span> pyrogram_patch <span class="imp">import</span> patch
-<span class="imp">from</span> pyrogram_patch.router <span class="imp">import</span> Router
-<span class="imp">from</span> pyrogram_patch.fsm <span class="imp">import</span> MemoryStorage
+          title="lifecycle.py"
+          code={`<span class="dec">@app.on_startup</span>
+<span class="kw">async def</span> <span class="fn">init</span>():
+    <span class="kw">await</span> database.connect()
+    print(<span class="str">"✅ Database ready"</span>)
 
-app = Client(<span class="str">"my_bot"</span>)
-router = Router()
-
-<span class="dec">@router.on_message</span>(filters.command(<span class="str">"start"</span>))
-<span class="kw">async def</span> <span class="fn">start</span>(client, message):
-    <span class="kw">await</span> message.reply(<span class="str">"Hello from pyrogram_patch!"</span>)
-
-<span class="kw">async def</span> <span class="fn">main</span>():
-    <span class="cmt"># Patch the client to enable advanced features</span>
-    manager = <span class="kw">await</span> patch(app)
-    manager.set_storage(MemoryStorage())
-    manager.include_router(router)
-
-    <span class="kw">await</span> app.start()
-    <span class="kw">await</span> idle()
-
-asyncio.run(main())`}
+<span class="dec">@app.on_shutdown</span>
+<span class="kw">async def</span> <span class="fn">cleanup</span>():
+    <span class="kw">await</span> database.disconnect()
+    print(<span class="str">"🛑 Disconnected"</span>)`}
         />
       </section>
 
-      {/* FSM Example */}
+      {/* Conversation Flow */}
       <section class="mb-10 reveal">
-        <h2 class="text-xl font-semibold mb-4 text-amber-400">First FSM Flow</h2>
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">First Conversation Flow</h2>
         <p class="text-slate-400 mb-4 text-sm">
-          Collect user input across multiple steps using finite state machines.
+          Collect user input across multiple steps with a declarative class-based conversation.
         </p>
         <CodeBlock
-          title="fsm_demo.py"
-          code={`<span class="imp">from</span> pyrogram_patch.fsm <span class="imp">import</span> State, StatesGroup, StateFilter
-<span class="imp">from</span> pyrogram_patch.router <span class="imp">import</span> Router
-<span class="imp">from</span> pyrogram_patch.patch_helper <span class="imp">import</span> PatchHelper
+          title="registration.py"
+          code={`<span class="imp">from</span> kurigram_addons <span class="imp">import</span> Conversation, ConversationState
 
-<span class="kw">class</span> <span class="cls">Registration</span>(StatesGroup):
-    name = State()
-    email = State()
+<span class="kw">class</span> <span class="cls">Registration</span>(Conversation):
+    name = ConversationState(initial=<span class="num">True</span>)
+    email = ConversationState()
 
-router = Router()
+    <span class="dec">@name.on_enter</span>
+    <span class="kw">async def</span> <span class="fn">ask_name</span>(self, ctx):
+        <span class="kw">await</span> ctx.message.reply(<span class="str">"What's your name?"</span>)
 
-<span class="dec">@router.on_message</span>(filters.command(<span class="str">"register"</span>))
-<span class="kw">async def</span> <span class="fn">start_registration</span>(client, message, patch_helper: PatchHelper):
-    <span class="kw">await</span> patch_helper.set_state(Registration.name)
-    <span class="kw">await</span> message.reply(<span class="str">"What's your name?"</span>)
+    <span class="dec">@name.on_message</span>
+    <span class="kw">async def</span> <span class="fn">save_name</span>(self, ctx):
+        <span class="kw">await</span> ctx.helper.update_data(name=ctx.message.text)
+        <span class="kw">await</span> self.goto(ctx, self.email)
 
-<span class="dec">@router.on_message</span>(StateFilter(Registration.name))
-<span class="kw">async def</span> <span class="fn">get_name</span>(client, message, patch_helper: PatchHelper):
-    <span class="kw">await</span> patch_helper.update_data(name=message.text)
-    <span class="kw">await</span> patch_helper.set_state(Registration.email)
-    <span class="kw">await</span> message.reply(<span class="str">"Great! What's your email?"</span>)
+    <span class="dec">@email.on_enter</span>
+    <span class="kw">async def</span> <span class="fn">ask_email</span>(self, ctx):
+        <span class="kw">await</span> ctx.message.reply(<span class="str">"Great! What's your email?"</span>)
 
-<span class="dec">@router.on_message</span>(StateFilter(Registration.email))
-<span class="kw">async def</span> <span class="fn">get_email</span>(client, message, patch_helper: PatchHelper):
-    data = <span class="kw">await</span> patch_helper.get_data()
-    name = data[<span class="str">"name"</span>]
-    <span class="kw">await</span> patch_helper.finish()
-    <span class="kw">await</span> message.reply(
-        <span class="str">f"Done! Name: </span>{name}<span class="str">, Email: </span>{message.text}<span class="str">"</span>
-    )`}
+    <span class="dec">@email.on_message</span>
+    <span class="kw">async def</span> <span class="fn">save_email</span>(self, ctx):
+        data = <span class="kw">await</span> ctx.helper.get_data()
+        name = data[<span class="str">"name"</span>]
+        <span class="kw">await</span> ctx.helper.finish()
+        <span class="kw">await</span> ctx.message.reply(
+            <span class="str">f"Done! Name: </span>{name}<span class="str">, Email: </span>{ctx.message.text}<span class="str">"</span>
+        )
+
+<span class="cmt"># Register with the client</span>
+app.include_conversation(Registration)`}
         />
       </section>
 
@@ -135,10 +126,10 @@ router = Router()
       <section class="mb-8 reveal">
         <h2 class="text-xl font-semibold mb-4 text-amber-400">What's Next?</h2>
         <div class="grid sm:grid-cols-2 gap-3 stagger">
-          <NextStep href="/pykeyboard" title="📖 PyKeyboard Guide" desc="Learn the full keyboard API — pagination, builders, and hooks" />
-          <NextStep href="/pyrogram-patch" title="🔧 Pyrogram Patch Guide" desc="Deep dive into routers, FSM, middleware, and storage" />
-          <NextStep href="/pyrogram-patch/fsm/states" title="🎯 State Machines" desc="State groups, transitions, and state guards" />
-          <NextStep href="/pyrogram-patch/storage" title="💾 Storage Backends" desc="MemoryStorage, RedisStorage, and custom backends" />
+          <NextStep href="/kurigram-addons/client" title="🤖 KurigramClient" desc="Full client API — middleware, routing, storage, FloodWait" />
+          <NextStep href="/kurigram-addons/lifecycle-hooks" title="🔄 Lifecycle Hooks" desc="on_startup / on_shutdown async callbacks" />
+          <NextStep href="/kurigram-addons/conversation" title="💬 Conversations" desc="Class-based multi-step FSM flows" />
+          <NextStep href="/kurigram-addons/rate-limit" title="⏱️ Rate Limiting" desc="Per-user / per-chat token-bucket rate limiter" />
         </div>
       </section>
     </Layout>
@@ -147,13 +138,13 @@ router = Router()
 
 function NextStep(props: { href: string; title: string; desc: string }) {
   return (
-    <a
+    <A
       href={props.href}
       class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all duration-200 hover:-translate-y-0.5"
       style={{ background: "var(--color-surface)" }}
     >
       <div class="font-semibold text-sm mb-1">{props.title}</div>
       <div class="text-xs text-slate-500">{props.desc}</div>
-    </a>
+    </A>
   );
 }
