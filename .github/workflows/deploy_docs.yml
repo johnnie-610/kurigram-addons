@@ -21,7 +21,7 @@ jobs:
       - name: Checkout (current / v0.4.x)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # need full history to also checkout v0.3.x
+          fetch-depth: 0
 
       # ── Build v0.4.x docs ────────────────────────────────────
       - name: Setup Node
@@ -53,57 +53,16 @@ jobs:
           # Has logo fix (f32aad3) and BASE_URL support (c5a1a4c)
           git checkout cf64cbc -- docs/
 
-      - name: Patch v0.3.x version switcher
+      - name: Patch v0.3.x Sidebar (version switcher + stripBase)
+        run: node scripts/patch-v03x-sidebar.js
+
+      - name: Patch v0.3.x getting-started links
         run: |
-          # Replace the old VERSIONS array with one that links to v0.4.x
-          node -e "
-          const fs = require('fs');
-          const file = 'docs/src/components/Sidebar.tsx';
-          let src = fs.readFileSync(file, 'utf8');
-
-          // Replace VERSIONS array
-          src = src.replace(
-            /const VERSIONS = \[[\s\S]*?\];/,
-            \`const VERSIONS = [
-            { label: \"v0.4.1 (latest)\", path: \"/kurigram-addons/v0.4/\" },
-            { label: \"v0.3.x\", path: \"/kurigram-addons/\" },
-          ];\`
-          );
-
-          // Replace currentVersion to use path matching
-          src = src.replace(
-            /const currentVersion = \(\) => VERSIONS\.find\(\(v\) => v\.latest\)!;/,
-            \`const currentVersion = () => {
-              if (typeof window === 'undefined') return VERSIONS[1];
-              const p = window.location.pathname;
-              return VERSIONS.find(v => p.startsWith(v.path)) || VERSIONS[1];
-            };\`
-          );
-
-          // Replace the button-based dropdown with anchor links
-          src = src.replace(
-            /<For each=\{VERSIONS\}>[\s\S]*?<\/For>/,
-            \`<For each={VERSIONS}>
-                {(ver) => (
-                  <a
-                    href={ver.path}
-                    class=\"block w-full text-left px-3 py-1.5 text-[0.7rem] font-mono transition-colors\"
-                    classList={{
-                      \"text-amber-400 bg-amber-500/10\": ver.path === currentVersion().path,
-                      \"text-slate-400 hover:text-amber-300 hover:bg-white/5\": ver.path !== currentVersion().path,
-                    }}
-                  >
-                    {ver.label}
-                  </a>
-                )}
-              </For>\`
-          );
-
-          fs.writeFileSync(file, src);
-          console.log('✅ Patched v0.3.x Sidebar.tsx with v0.4.x version switcher');
-          "
-
-
+          sed -i 's|href="/pykeyboard"|href="/kurigram-addons/pykeyboard"|g' docs/src/routes/getting-started.tsx
+          sed -i 's|href="/pyrogram-patch"|href="/kurigram-addons/pyrogram-patch"|g' docs/src/routes/getting-started.tsx
+          sed -i 's|href="/pyrogram-patch/fsm/states"|href="/kurigram-addons/pyrogram-patch/fsm/states"|g' docs/src/routes/getting-started.tsx
+          sed -i 's|href="/pyrogram-patch/storage"|href="/kurigram-addons/pyrogram-patch/storage"|g' docs/src/routes/getting-started.tsx
+          echo "✅ Patched v0.3.x getting-started.tsx links"
 
       - name: Install v0.3.x dependencies
         working-directory: ./docs
@@ -129,7 +88,6 @@ jobs:
 
       - name: SPA fallback for v0.3.x
         run: |
-          # Only create 404.html if it doesn't already exist
           [ -f _site/404.html ] || cp _site/index.html _site/404.html || true
 
       - name: Upload artifact
