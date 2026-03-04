@@ -379,6 +379,7 @@ class InlineKeyboard(KeyboardBase):
             pagination = self._build_large_pagination()
 
         self.keyboard.append(pagination)
+        self._update_keyboard()
 
     def _build_small_pagination(self) -> List[InlineKeyboardButton]:
         """Build pagination for small number of pages (≤5).
@@ -409,9 +410,9 @@ class InlineKeyboard(KeyboardBase):
         ]
 
     def _build_large_pagination(self) -> list[InlineKeyboardButton]:
-        if self.current_page <= 3:
+        if self.current_page <= 2:
             return self._build_left_pagination()
-        elif self.current_page > self.count_pages - 3:
+        elif self.current_page >= self.count_pages - 1:
             return self._build_right_pagination()
         return self._build_middle_pagination()
 

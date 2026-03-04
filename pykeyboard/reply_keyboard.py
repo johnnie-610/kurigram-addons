@@ -247,21 +247,18 @@ class ReplyButton(Button):
             web_app=self.web_app,
         )
 
-    def write(self, client: Any = None) -> Any:
+    def write(self) -> Any:
         """Pyrogram serialization method.
 
         This method is called by Pyrogram to serialize the button for sending
         to Telegram. It delegates to the Pyrogram button's write method.
-
-        Args:
-            client: The Pyrogram client instance (optional).
 
         Returns:
             Serialized button data for Telegram API.
         """
         pyrogram_button = self.to_pyrogram()
 
-        return pyrogram_button.write(client)
+        return pyrogram_button.write()
 
 
 class PyReplyKeyboardRemove(BaseModel):

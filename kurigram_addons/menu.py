@@ -260,7 +260,7 @@ class Menu:
             await menu_ref.edit(query)
             await query.answer()
 
-        router.on_callback(nav_data)(lambda c, q: _nav_handler(c, q))
+        router.on_callback(nav_data)(_nav_handler)
 
         # Action button handlers
         for btn in self._buttons:

@@ -202,6 +202,12 @@ def create_decorator_method(
             async def wrapper(client: Client, event: Any, **kwargs) -> Any:
                 """Wrapper that forwards to the original handler."""
                 try:
+                    try:
+                        from kurigram_addons.depends import resolve_dependencies
+                        deps = await resolve_dependencies(func, client, event)
+                        kwargs.update(deps)
+                    except ImportError:
+                        pass
                     return await func(client, event, **kwargs)
                 except Exception as e:
                     logger.error(f"Error in handler {func.__name__}: {e}")

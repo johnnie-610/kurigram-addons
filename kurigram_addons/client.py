@@ -122,7 +122,7 @@ class KurigramClient(Client):
 
         # Set storage if provided
         if self._storage:
-            await self._pool.set_storage(self._storage)
+            self._pool.set_fsm_storage(self._storage)
 
         # Register any routers that were added before start()
         for router in self._routers:
@@ -208,7 +208,7 @@ class KurigramClient(Client):
         """
         self._storage = storage
         if self._pool:
-            await self._pool.set_storage(storage)
+            self._pool.set_fsm_storage(storage)
 
     def _ensure_default_router(self) -> "Router":
         """Get or create a default Router for conversation/menu handlers."""

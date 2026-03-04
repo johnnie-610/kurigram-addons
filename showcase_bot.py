@@ -108,7 +108,7 @@ class Registration(Conversation):
 
     @confirm.on_enter
     async def ask_confirm(self, ctx):
-        data = await ctx.helper.get_data()
+        data = await ctx.helper.data
         await ctx.message.reply(
             f"✅ **Confirm your details:**\n\n"
             f"👤 Name: {data.get('name')}\n"
@@ -119,7 +119,7 @@ class Registration(Conversation):
     @confirm.on_message
     async def do_confirm(self, ctx):
         if ctx.message.text.lower() == "yes":
-            data = await ctx.helper.get_data()
+            data = await ctx.helper.data
             await ctx.message.reply(
                 f"🎉 **Registration Complete!**\n"
                 f"Welcome, {data.get('name')}!"
@@ -155,15 +155,20 @@ async def register_cmd(client, message: Message, patch_helper):
 main_menu = Menu("main", text="📋 **Main Menu**\n\nChoose a section:")
 main_menu.button("👤 Profile", goto="profile")
 main_menu.button("⚙️ Settings", goto="settings")
-main_menu.button("📊 Stats", callback=lambda c, q: q.answer("📊 Stats coming soon!", show_alert=True))
+async def alert_stats(c, q): await q.answer("📊 Stats coming soon!", show_alert=True)
+main_menu.button("📊 Stats", callback=alert_stats)
 
 profile_menu = Menu("profile", text="👤 **Profile**\n\nManage your profile:", parent=main_menu)
-profile_menu.button("✏️ Edit Name", callback=lambda c, q: q.answer("✏️ Edit name", show_alert=True))
-profile_menu.button("📸 Change Photo", callback=lambda c, q: q.answer("📸 Photo upload", show_alert=True))
+async def alert_edit_name(c, q): await q.answer("✏️ Edit name", show_alert=True)
+async def alert_change_photo(c, q): await q.answer("📸 Photo upload", show_alert=True)
+profile_menu.button("✏️ Edit Name", callback=alert_edit_name)
+profile_menu.button("📸 Change Photo", callback=alert_change_photo)
 
 settings_menu = Menu("settings", text="⚙️ **Settings**\n\nConfigure your preferences:", parent=main_menu)
-settings_menu.button("🔔 Notifications", callback=lambda c, q: q.answer("🔔 Toggle notif", show_alert=True))
-settings_menu.button("🌐 Language", callback=lambda c, q: q.answer("🌐 Pick lang", show_alert=True))
+async def alert_notif(c, q): await q.answer("🔔 Toggle notif", show_alert=True)
+async def alert_lang(c, q): await q.answer("🌐 Pick lang", show_alert=True)
+settings_menu.button("🔔 Notifications", callback=alert_notif)
+settings_menu.button("🌐 Language", callback=alert_lang)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -240,7 +245,7 @@ async def ban_cmd(client, message: Message):
         args = parse_command(message.text, user_id=int, reason=str)
         uid = args.get("user_id", 0)
         reason = args.get("reason", "No reason")
-        await message.reply(f"🔨 Banned user `{uid}`: {reason}")
+        await message.reply(f"🔨 Banned user `{uid}`: Reason: `{reason}`")
     except Exception as e:
         await message.reply(f"Usage: `/ban <user_id> <reason>`\nError: {e}")
 
@@ -299,39 +304,35 @@ async def pagination_demo(client, query: CallbackQuery):
     await _show_page(query, page=1)
 
 
+from pykeyboard.errors import PaginationUnchangedError
+
+@router.on_callback_query(filters.regex(r"^page_(\d+)$"))
+async def _page_handler(client, query: CallbackQuery):
+    page = int(query.matches[0].group(1))
+    await _show_page(query, page)
+
 async def _show_page(query: CallbackQuery, page: int):
     """Build and show a specific page."""
     total_pages = 10
     kb = InlineKeyboard()
-    kb.add(InlineButton(text=f"📄 Content for page {page}", callback_data="noop"))
-    kb.paginate(total_pages, page, "page_{number}")
+    
+    try:
+        kb.paginate(total_pages, page, "page_{number}")
+    except PaginationUnchangedError:
+        # User clicked the page they are already on
+        await query.answer("You are already on this page!")
+        return
 
     await query.edit_message_text(
-        f"📄 **Pagination Demo**\n\nPage **{page}** of {total_pages}:",
+        f"📄 **Pagination Demo**\n\nPage **{page}** of {total_pages}:\n\nHere is the content for page {page}!",
         reply_markup=kb,
     )
     await query.answer()
 
-
-# Handle pagination button presses (page_1, page_2, ... page_10)
-@router.on_message(filters.regex(r"^$") & filters.create(lambda _, __, ___: False))
-async def _placeholder(*_):
-    """Placeholder — pagination handlers registered below."""
-
-
-# Register page handlers for 1..10
-for _page_num in range(1, 11):
-    _p = _page_num  # capture loop variable
-
-    @router.on_callback(f"page_{_p}")
-    async def _page_handler(client, query: CallbackQuery, page=_p):
-        await _show_page(query, page)
-
-
 @router.on_callback("noop")
 async def noop_cb(client, query: CallbackQuery):
     """No-op callback for content buttons."""
-    await query.answer()
+    await query.answer("Nothing to see here.")
 
 
 # ═══════════════════════════════════════════════════════════════

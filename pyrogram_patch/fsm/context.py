@@ -125,7 +125,7 @@ class FSMContext:
         state["data"] = {}
         await self._storage.set_state(self._id, state)
 
-    # ---- combined ----
+    # combined 
     async def get_state_and_data(self) -> Optional[Dict[str, Any]]:
         """Return the full FSM state dict, or None if absent."""
         return await self._storage.get_state(self._id)

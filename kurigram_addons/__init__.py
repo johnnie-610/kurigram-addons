@@ -27,16 +27,16 @@ import os as _os
 # Suppress deprecation warnings from our own re-exports
 _os.environ["_KURIGRAM_ADDONS_INTERNAL"] = "1"
 
-# ── Client ──────────────────────────────────────────────────────
+# Client
 from kurigram_addons.client import KurigramClient
 
-# ── Conversation handler ────────────────────────────────────────
+# Conversation handler
 from kurigram_addons.conversation import Conversation, ConversationContext, ConversationState
 
-# ── Menu system ─────────────────────────────────────────────────
+# Menu system
 from kurigram_addons.menu import Menu, MenuButton
 
-# ── Keyboards (from pykeyboard) ────────────────────────────────
+# Keyboards (from pykeyboard)
 from pykeyboard import (
     Button,
     ForceReply,
@@ -59,7 +59,7 @@ try:
 except ImportError:
     pass
 
-# ── Pyrogram Patch ──────────────────────────────────────────────
+# Pyrogram Patch
 from pyrogram_patch.patch import PatchManager, patch
 
 # Router
@@ -89,14 +89,14 @@ from pyrogram_patch.errors import (
     ValidationError,
 )
 
-# ── Phase 3: DX Improvements ───────────────────────────────────
+# Phase 3: DX Improvements
 from kurigram_addons.command_parser import CommandParseError, parse_command
 from kurigram_addons.depends import Depends, resolve_dependencies
 from kurigram_addons.flood_wait import FloodWaitHandler
 from kurigram_addons.rate_limit import RateLimit
 
-# ── Version ─────────────────────────────────────────────────────
-__version__ = "0.4.1"
+# Version
+__version__ = "0.4.2"
 
 __all__ = [
     # Client

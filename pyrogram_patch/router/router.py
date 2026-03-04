@@ -104,7 +104,7 @@ class Router(PatchedDecorators):
 
         logger.debug("Router initialized")
 
-    # ── Convenience decorators ──────────────────────────────────
+    # Convenience decorators
 
     def on_callback(
         self, data: str, *, group: int = 0

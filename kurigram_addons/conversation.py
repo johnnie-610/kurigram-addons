@@ -90,7 +90,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger("kurigram.conversation")
 
 
-# ── Context passed to all conversation hooks ────────────────────
+# Context passed to all conversation hooks
 
 
 @dataclass
@@ -135,7 +135,7 @@ class ConversationContext:
         raise ValueError("No user context available")
 
 
-# ── State descriptor ────────────────────────────────────────────
+# State descriptor
 
 
 class ConversationState:
@@ -173,7 +173,7 @@ class ConversationState:
         """The FSM state string (e.g. 'Registration:name')."""
         return f"{self._owner_name}:{self._name}"
 
-    # ── Hook decorators ─────────────────────────────────────────
+    # Hook decorators
 
     def on_enter(self, fn: Callable) -> Callable:
         """Decorator: called when transitioning INTO this state.
@@ -205,7 +205,7 @@ class ConversationState:
         return f"<ConversationState {self.state_string}>"
 
 
-# ── Conversation metaclass ──────────────────────────────────────
+# Conversation metaclass
 
 
 class ConversationMeta(type):
@@ -290,7 +290,7 @@ class ConversationMeta(type):
         return cls
 
 
-# ── Conversation base class ─────────────────────────────────────
+# Conversation base class
 
 
 class Conversation(metaclass=ConversationMeta):
@@ -383,12 +383,12 @@ class Conversation(metaclass=ConversationMeta):
                 async def _msg_handler(
                     client: Any,
                     message: Any,
-                    helper: Any,
+                    patch_helper: Any,
                     _method: Callable = method,
                     _instance: "Conversation" = instance,
                 ) -> None:
                     ctx = ConversationContext(
-                        client=client, message=message, helper=helper
+                        client=client, message=message, helper=patch_helper
                     )
                     await _method(ctx)
 
@@ -412,14 +412,14 @@ class Conversation(metaclass=ConversationMeta):
                 async def _cb_handler(
                     client: Any,
                     callback_query: Any,
-                    helper: Any,
+                    patch_helper: Any,
                     _method: Callable = method,
                     _instance: "Conversation" = instance,
                 ) -> None:
                     ctx = ConversationContext(
                         client=client,
                         callback_query=callback_query,
-                        helper=helper,
+                        helper=patch_helper,
                     )
                     await _method(ctx)
 
