@@ -1,4 +1,4 @@
-"""showcase_bot.py — Demonstrates all kurigram-addons v0.4.0 features.
+"""showcase_bot.py — Demonstrates all kurigram-addons v0.4.1 features.
 
 Run:
     BOT_TOKEN=... API_ID=... API_HASH=... python showcase_bot.py
@@ -19,9 +19,11 @@ from kurigram_addons import (
     ReplyButton,
     Conversation,
     ConversationState,
+    ConversationContext,
     Menu,
     Depends,
     RateLimit,
+    FloodWaitHandler,
     parse_command,
 )
 from pyrogram import filters
@@ -51,9 +53,11 @@ async def start_cmd(client, message: Message):
     kb.button("⌨️ Keyboards", callback="demo:keyboard")
     kb.button("🔧 Commands", callback="demo:commands")
     kb.button("⚡ Rate Limit", callback="demo:rate_limit")
+    kb.button("📄 Pagination", callback="demo:pagination")
+    kb.button("💬 Reply KB", callback="demo:reply_kb")
 
     await message.reply(
-        "👋 **kurigram-addons v0.4.0 Showcase**\n\n"
+        "👋 **kurigram-addons v0.4.1 Showcase**\n\n"
         "Pick a feature to explore:",
         reply_markup=kb,
     )
@@ -129,15 +133,15 @@ class Registration(Conversation):
 async def start_registration(client, query: CallbackQuery):
     """Trigger registration conversation from button."""
     await query.answer("Starting registration...")
-    await query.message.reply("Let's begin! Type /register to start.")
+    await query.message.reply("Send /register to begin the registration flow.")
 
 
 @router.on_command("register")
 async def register_cmd(client, message: Message, patch_helper):
-    """Start the registration conversation."""
+    """Start the registration conversation via manual trigger."""
+    # Conversation handlers are auto-registered via app.include_conversation()
+    # but we still need to trigger the initial state transition
     reg = Registration()
-    from kurigram_addons.conversation import ConversationContext
-
     ctx = ConversationContext(
         client=client, message=message, helper=patch_helper
     )
@@ -285,6 +289,75 @@ async def whoami_cmd(client, message: Message, user=Depends(get_user_info)):
 
 
 # ═══════════════════════════════════════════════════════════════
+# 8. PAGINATION KEYBOARD
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.on_callback("demo:pagination")
+async def pagination_demo(client, query: CallbackQuery):
+    """Show a paginated keyboard."""
+    await _show_page(query, page=1)
+
+
+async def _show_page(query: CallbackQuery, page: int):
+    """Build and show a specific page."""
+    total_pages = 10
+    kb = InlineKeyboard()
+    kb.add(InlineButton(text=f"📄 Content for page {page}", callback_data="noop"))
+    kb.paginate(total_pages, page, "page_{number}")
+
+    await query.edit_message_text(
+        f"📄 **Pagination Demo**\n\nPage **{page}** of {total_pages}:",
+        reply_markup=kb,
+    )
+    await query.answer()
+
+
+# Handle pagination button presses (page_1, page_2, ... page_10)
+@router.on_message(filters.regex(r"^$") & filters.create(lambda _, __, ___: False))
+async def _placeholder(*_):
+    """Placeholder — pagination handlers registered below."""
+
+
+# Register page handlers for 1..10
+for _page_num in range(1, 11):
+    _p = _page_num  # capture loop variable
+
+    @router.on_callback(f"page_{_p}")
+    async def _page_handler(client, query: CallbackQuery, page=_p):
+        await _show_page(query, page)
+
+
+@router.on_callback("noop")
+async def noop_cb(client, query: CallbackQuery):
+    """No-op callback for content buttons."""
+    await query.answer()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 9. REPLY KEYBOARD
+# ═══════════════════════════════════════════════════════════════
+
+
+@router.on_callback("demo:reply_kb")
+async def reply_kb_demo(client, query: CallbackQuery):
+    """Show a reply keyboard."""
+    kb = ReplyKeyboard(resize_keyboard=True, one_time_keyboard=True)
+    kb.add(
+        ReplyButton(text="📍 Send Location", request_location=True),
+        ReplyButton(text="📞 Share Contact", request_contact=True),
+    )
+    kb.row(ReplyButton(text="❌ Remove Keyboard"))
+
+    await query.message.reply(
+        "💬 **Reply Keyboard Demo**\n\n"
+        "Choose an option below (one-time keyboard):",
+        reply_markup=kb,
+    )
+    await query.answer()
+
+
+# ═══════════════════════════════════════════════════════════════
 # MAIN — KurigramClient replaces patch()
 # ═══════════════════════════════════════════════════════════════
 
@@ -299,8 +372,24 @@ app = KurigramClient(
     max_flood_wait=60,
 )
 
-# Register everything
+# ── Lifecycle hooks ─────────────────────────────────────────────
+
+
+@app.on_startup
+async def on_start():
+    """Runs after the client connects to Telegram."""
+    logger.info("✅ Bot started! Ready to handle updates.")
+
+
+@app.on_shutdown
+async def on_stop():
+    """Runs before the client disconnects."""
+    logger.info("👋 Bot stopping. Cleaning up resources...")
+
+
+# ── Register everything ────────────────────────────────────────
 app.include_router(router)
+app.include_conversation(Registration)
 app.include_menus(main_menu, profile_menu, settings_menu)
 
 if __name__ == "__main__":

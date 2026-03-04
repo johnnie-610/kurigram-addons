@@ -67,7 +67,7 @@ from pyrogram_patch.router.router import Router
 
 # FSM
 from pyrogram_patch.fsm.base_storage import BaseStorage
-from pyrogram_patch.fsm.memory_storage import MemoryStorage
+from pyrogram_patch.fsm.storages.memory_storage import MemoryStorage
 from pyrogram_patch.fsm.states import StatesGroup
 
 try:
@@ -75,12 +75,6 @@ try:
 except ImportError:
     pass
 
-# Middleware
-from pyrogram_patch.middlewares.middleware_types import (
-    OnAfterMiddlewareType,
-    OnAroundMiddlewareType,
-    OnBeforeMiddlewareType,
-)
 
 # Errors
 from pyrogram_patch.errors import (
@@ -137,10 +131,6 @@ __all__ = [
     "MemoryStorage",
     "RedisStorage",
     "StatesGroup",
-    # Middleware types
-    "OnBeforeMiddlewareType",
-    "OnAfterMiddlewareType",
-    "OnAroundMiddlewareType",
     # Errors
     "PyrogramPatchError",
     "ValidationError",
