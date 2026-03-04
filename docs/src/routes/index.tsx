@@ -46,16 +46,28 @@ export default function Home() {
       {/* Feature cards */}
       <section class="grid sm:grid-cols-2 gap-4 mb-12 stagger">
         <FeatureCard
+          icon="🤖"
+          title="KurigramClient"
+          description="Drop-in Client subclass with built-in middleware, FSM, routing, FloodWait handling, and lifecycle hooks — replaces the legacy patch() API."
+          href="/kurigram-addons/client"
+        />
+        <FeatureCard
           icon="⌨️"
-          title="PyKeyboard"
+          title="Keyboards"
           description="Type-safe, declarative UI keyboard framework. Inline and reply keyboards with automatic layout, pagination, language selection, and a fluent builder API."
-          href="/pykeyboard"
+          href="/pykeyboard/inline-keyboard"
+        />
+        <FeatureCard
+          icon="💬"
+          title="Conversations"
+          description="Class-based multi-step conversations with declarative state definitions, auto-registered handlers, and type-safe context passing."
+          href="/kurigram-addons/conversation"
         />
         <FeatureCard
           icon="🔧"
-          title="Pyrogram Patch"
-          description="Engine-level patching for clean bot architecture. Hierarchical routers, finite state machines, tri-phase middleware, and circuit breaker resilience."
-          href="/pyrogram-patch"
+          title="Routing & FSM"
+          description="Hierarchical routers, finite state machines, tri-phase middleware, and circuit breaker resilience — all built into the client."
+          href="/pyrogram-patch/router"
         />
         <FeatureCard
           icon="📦"
@@ -65,21 +77,9 @@ export default function Home() {
         />
         <FeatureCard
           icon="🛡️"
-          title="Battle-Tested Errors"
-          description="Rich structured error hierarchy with TraceInfo, JSON serialization, error IDs for log correlation, and wrap decorators for automatic error handling."
+          title="Error Handling"
+          description="Rich structured error hierarchy with TraceInfo, JSON serialization, error IDs for log correlation, and wrap decorators for automatic handling."
           href="/pyrogram-patch/errors"
-        />
-        <FeatureCard
-          icon="🤖"
-          title="KurigramClient"
-          description="Drop-in Client subclass with built-in middleware, FSM, routing, FloodWait handling, and lifecycle hooks — replaces the legacy patch() API."
-          href="/kurigram-addons/client"
-        />
-        <FeatureCard
-          icon="💬"
-          title="Conversations"
-          description="Class-based multi-step conversations with declarative state definitions, auto-registered handlers, and type-safe context passing."
-          href="/kurigram-addons/conversation"
         />
       </section>
 
