@@ -185,7 +185,7 @@ function NavGroup(props: { item: NavItem; depth: number }) {
 
 /** Available documentation versions */
 const VERSIONS = [
-  { label: "v0.4.1 (latest)", path: "/kurigram-addons/v0.4/" },
+  { label: "v0.4.x (latest)", path: "/kurigram-addons/v0.4/" },
   { label: "v0.3.x", path: "/kurigram-addons/" },
 ];
 
@@ -293,7 +293,7 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
       {/* Footer links */}
       <div class="mt-6 px-3 pt-4 border-t border-white/10 space-y-2">
         <a
-          href="https://github.com/johnnie-610/kurigram-addons/releases"
+          href="https://github.com/johnnie-610/kurigram-addons/blob/main/CHANGELOG.md"
           target="_blank"
           rel="noopener noreferrer"
           class="flex items-center gap-2 text-xs text-slate-500 hover:text-amber-300 transition-colors"
