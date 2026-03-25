@@ -134,6 +134,41 @@ class BaseStorage(abc.ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def increment(
+        self,
+        identifier: str,
+        amount: int = 1,
+        *,
+        ttl: Optional[int] = None,
+    ) -> int:
+        """Atomically increment an integer counter stored at *identifier*.
+
+        If the key does not exist it is created with value *amount*.
+        The counter is stored as a plain integer, not as a full state dict,
+        and lives in a separate namespace so it does not interfere with FSM
+        state keys.
+
+        Args:
+            identifier: key (should use a distinct prefix, e.g. ``__ctr__:…``).
+            amount: value to add (default: 1).
+            ttl: optional TTL in seconds.  Refreshed on every increment when
+                 provided.
+
+        Returns:
+            The new counter value after the increment.
+
+        Raises:
+            errors.PyrogramPatchError on backend failures.
+
+        Note:
+            Redis maps this directly to ``INCRBY`` + ``EXPIRE`` — O(1) and
+            truly atomic.  MemoryStorage uses the internal asyncio lock.
+            Both are far cheaper than the CAS-retry loop previously used for
+            counter patterns like rate limiting.
+        """
+        raise NotImplementedError
+
 
 # Optional: a Protocol for duck-typing (useful in tests)
 class BaseStorageProtocol(Protocol):
@@ -163,3 +198,11 @@ class BaseStorageProtocol(Protocol):
     async def list_keys(self, pattern: str = "*") -> list[str]: ...
 
     async def clear_namespace(self) -> int: ...
+
+    async def increment(
+        self,
+        identifier: str,
+        amount: int = 1,
+        *,
+        ttl: Optional[int] = None,
+    ) -> int: ...

@@ -13,14 +13,21 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
-import redis.asyncio as aioredis
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from pyrogram_patch import errors
-from pyrogram_patch.circuit_breaker import (CircuitBreakerConfig,
-                                            get_circuit_breaker)
+from pyrogram_patch.circuit_breaker import AsyncCircuitBreaker, CircuitBreakerConfig
 from pyrogram_patch.fsm.base_storage import BaseStorage
+
+try:
+    from redis.asyncio import Redis as aioredis
+except ImportError:
+    raise ImportError(
+        "RedisStorage requires 'redis'.  "
+        "Install it with: `pip install redis`"
+    )
+
 
 logger = logging.getLogger("pyrogram_patch.fsm.redis_storage")
 
@@ -46,9 +53,10 @@ class RedisStorage(BaseStorage):
         self._redis = redis
         self._prefix = prefix
         self._default_ttl = default_ttl
-        self._circuit_breaker = get_circuit_breaker(
-            "redis", circuit_breaker_config
-        )
+        # Each RedisStorage instance owns its own breaker so a Redis failure
+        # for one Client does not trip the breaker for every other Client
+        # running in the same process (multi-account bots etc.).
+        self._circuit_breaker = AsyncCircuitBreaker(circuit_breaker_config)
 
     def _key(self, identifier: str) -> str:
         return f"{self._prefix}:{identifier}"
@@ -183,7 +191,16 @@ class RedisStorage(BaseStorage):
         async def _list_keys_impl() -> list[str]:
             full_pattern = f"{self._prefix}:{pattern}"
             keys = await self._redis.keys(full_pattern)
-            return [k.decode().split(":", 1)[1] for k in keys]
+            prefix = f"{self._prefix}:"
+            # Use removeprefix + startswith guard instead of split(":", 1)[1].
+            # split()[1] raises IndexError when a key has no colon at all
+            # (e.g. a key written by another process, or prefix itself
+            # containing extra colons).
+            return [
+                k.decode().removeprefix(prefix)
+                for k in keys
+                if k.decode().startswith(prefix)
+            ]
 
         return await self._circuit_breaker.call(_list_keys_impl)
 
@@ -196,3 +213,32 @@ class RedisStorage(BaseStorage):
             return int(deleted)
 
         return await self._circuit_breaker.call(_clear_namespace_impl)
+
+    async def increment(
+        self,
+        identifier: str,
+        amount: int = 1,
+        *,
+        ttl: Optional[int] = None,
+    ) -> int:
+        """Atomically increment a counter using Redis INCRBY.
+
+        Maps directly to ``INCRBY`` (creates the key if absent, starting
+        from 0).  When *ttl* is given ``EXPIRE`` is issued in the same
+        pipeline so the key is automatically cleaned up.
+
+        Counter keys use the same prefix as FSM state keys but callers
+        should use a distinct identifier namespace (e.g. ``__ctr__:…``) to
+        avoid accidental collisions with state keys.
+        """
+        async def _increment_impl() -> int:
+            key = self._key(identifier)
+            pipe = self._redis.pipeline()
+            pipe.incrby(key, amount)
+            ttl_use = self._default_ttl if ttl is None else ttl
+            if ttl_use and ttl_use > 0:
+                pipe.expire(key, ttl_use)
+            results = await pipe.execute()
+            return int(results[0])
+
+        return await self._circuit_breaker.call(_increment_impl)

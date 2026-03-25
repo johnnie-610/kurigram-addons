@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger("pyrogram_patch.fsm.states")
 
@@ -57,6 +57,22 @@ class State:
     @property
     def name(self) -> str:
         return str(self)
+
+    def filter(self) -> "StateFilter":
+        """Return a :class:`~pyrogram_patch.fsm.filter.StateFilter` bound to this state.
+
+        Allows the ergonomic shorthand::
+
+            @router.on_message(Registration.name.filter())
+            async def handler(client, message, patch_helper): ...
+
+        instead of the stringly-typed::
+
+            @router.on_message(StateFilter("Registration:name"))
+            async def handler(client, message, patch_helper): ...
+        """
+        from pyrogram_patch.fsm.filter import StateFilter
+        return StateFilter(str(self))
 
 
 class StatesGroupMeta(type):

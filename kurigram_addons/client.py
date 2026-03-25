@@ -41,10 +41,11 @@ from pyrogram import Client
 
 from pyrogram_patch import errors
 from pyrogram_patch.dispatcher import PatchedDispatcher
-from pyrogram_patch.patch_data_pool import PatchDataPool, initialize_global_pool
+from pyrogram_patch.patch_data_pool import PatchDataPool, initialize_global_pool, reset_global_pool
 
 if TYPE_CHECKING:
     from pyrogram_patch.fsm.base_storage import BaseStorage
+    from pyrogram_patch.patch_data_pool import PoolStatistics
     from pyrogram_patch.router.router import Router
 
     MiddlewareT = TypeVar("MiddlewareT", bound=Callable)
@@ -66,6 +67,10 @@ class KurigramClient(Client):
         storage: FSM storage backend (``MemoryStorage`` or ``RedisStorage``).
         auto_flood_wait: Automatically retry on ``FloodWait`` errors.
         max_flood_wait: Maximum seconds to wait before raising (default: 60).
+        health_port: If set, start an HTTP health-check server on this port.
+                     ``GET /health`` returns pool stats and storage health as
+                     JSON.  Useful for Kubernetes probes and Docker HEALTHCHECK.
+        health_host: Bind address for the health server (default: ``"0.0.0.0"``).
         **kwargs: All other arguments forwarded to ``pyrogram.Client``.
     """
 
@@ -76,6 +81,8 @@ class KurigramClient(Client):
         storage: Optional["BaseStorage"] = None,
         auto_flood_wait: bool = False,
         max_flood_wait: int = 60,
+        health_port: Optional[int] = None,
+        health_host: str = "0.0.0.0",
         **kwargs: Any,
     ) -> None:
         super().__init__(name, **kwargs)
@@ -89,6 +96,11 @@ class KurigramClient(Client):
         # FloodWait config
         self.auto_flood_wait = auto_flood_wait
         self.max_flood_wait = max_flood_wait
+
+        # Health server config
+        self._health_port = health_port
+        self._health_host = health_host
+        self._health_server: Optional[Any] = None
 
         # Lifecycle hooks
         self._startup_hooks: List[Callable] = []
@@ -123,6 +135,23 @@ class KurigramClient(Client):
         # Set storage if provided
         if self._storage:
             self._pool.set_fsm_storage(self._storage)
+            # Auto-start storage backends that have an async lifecycle.
+            # Without this, MemoryStorage's TTL cleanup task never runs —
+            # TTLs are silently ignored and the storage leaks memory in
+            # long-running bots.  Calling start() on backends that don't
+            # need it (e.g. RedisStorage) is a no-op.
+            try:
+                await self._storage.start()
+                logger.debug(
+                    "Storage backend '%s' started",
+                    type(self._storage).__name__,
+                )
+            except Exception:
+                logger.warning(
+                    "Storage backend '%s' start() failed",
+                    type(self._storage).__name__,
+                    exc_info=True,
+                )
 
         # Register any routers that were added before start()
         for router in self._routers:
@@ -167,7 +196,7 @@ class KurigramClient(Client):
 
         logger.debug("Router %r included", router)
 
-    def include_middleware(
+    async def include_middleware(
         self,
         middleware: MiddlewareT,
         *,
@@ -194,7 +223,8 @@ class KurigramClient(Client):
                 "or use a Router to declare handlers before start()."
             )
 
-        return self._pool.include_middleware(
+        # PatchDataPool.add_middleware is async
+        return await self._pool.add_middleware(
             middleware, kind=kind, priority=priority
         )
 
@@ -293,6 +323,20 @@ class KurigramClient(Client):
 
         result = await super().start(*args, **kwargs)
 
+        # Start health server if configured
+        if self._health_port is not None:
+            from kurigram_addons.health import HealthServer
+            self._health_server = HealthServer(
+                port=self._health_port,
+                host=self._health_host,
+                client_ref=self,
+            )
+            try:
+                await self._health_server.start()
+            except Exception:
+                logger.warning("Health server failed to start", exc_info=True)
+                self._health_server = None
+
         # Execute startup hooks
         for hook in self._startup_hooks:
             try:
@@ -321,6 +365,28 @@ class KurigramClient(Client):
                 except Exception:
                     logger.warning(
                         "Error during pool cleanup", exc_info=True
+                    )
+            # Reset the module-level singleton so that a subsequent start()
+            # call creates a completely fresh pool rather than reusing the
+            # cleared one (fixes the "zombie pool on restart" bug).
+            # Stop health server
+            if self._health_server is not None:
+                try:
+                    await self._health_server.stop()
+                except Exception:
+                    logger.warning("Health server failed to stop cleanly", exc_info=True)
+                self._health_server = None
+            reset_global_pool()
+            self._pool = None
+            # Stop the storage backend (cancels MemoryStorage cleanup task etc.)
+            if self._storage:
+                try:
+                    await self._storage.stop()
+                except Exception:
+                    logger.warning(
+                        "Storage backend '%s' stop() failed",
+                        type(self._storage).__name__,
+                        exc_info=True,
                     )
             self._kurigram_initialized = False
             logger.info("KurigramClient '%s' stopped", self.name)
@@ -371,6 +437,24 @@ class KurigramClient(Client):
     def pool(self) -> Optional[PatchDataPool]:
         """Access the underlying PatchDataPool (or None if not started)."""
         return self._pool
+
+    async def stats(self) -> "PoolStatistics":
+        """Return a typed snapshot of pool operational metrics.
+
+        Returns a :class:`~pyrogram_patch.patch_data_pool.PoolStatistics`
+        dataclass with IDE-autocompleted fields.  Raises :class:`PatchError`
+        if called before ``start()``.
+
+        Example::
+
+            s = await app.stats()
+            print(f"active helpers: {s.active_helpers}, uptime: {s.uptime:.0f}s")
+        """
+        if not self._pool:
+            raise errors.PatchError(
+                "Cannot get stats before start().  Call await app.start() first."
+            )
+        return await self._pool.get_statistics()
 
     def __repr__(self) -> str:
         status = "running" if self._kurigram_initialized else "idle"

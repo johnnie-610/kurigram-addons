@@ -29,17 +29,12 @@ from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Type
 
-# Configure module logger (library users can reconfigure root or module logger)
-logger = logging.getLogger("pyrogram_patch")
-if not logger.handlers:
-    # Basic default handler if the application didn't configure logging.
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+# Libraries must not configure logging handlers — that is the application's job.
+# Per PEP 3105 / logging HOWTO, a library adds only a NullHandler so that
+# "No handlers could be found" warnings are suppressed when the application
+# hasn't configured logging at all.
+logger = logging.getLogger("Kurigram_Addons")
+logger.addHandler(logging.NullHandler())
 
 
 @dataclass
@@ -125,7 +120,7 @@ class PyrogramPatchError(Exception):
         context: Optional[Dict[str, Any]] = None,
         trace: Optional[TraceInfo] = None,
         cause: Optional[BaseException] = None,
-        log_on_create: bool = True,
+        log_on_create: bool = False,
     ):
         super().__init__(message)
         self.message = message

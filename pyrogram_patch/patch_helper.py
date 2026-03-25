@@ -30,6 +30,21 @@ MiddlewareFunc = Callable[[UpdateT, Client, "PatchHelper"], Awaitable[Any]]
 
 logger = logging.getLogger("pyrogram_patch.patch_helper")
 
+# Module-level cache for handler parameter → injection-rule mappings.
+#
+# Keyed by id(handler) rather than the handler object itself to avoid holding
+# a strong reference (which would prevent garbage collection).  The values
+# are plain dicts — safe to read concurrently because they are written once
+# (first call) and then only ever read.
+#
+# Using a module-level dict instead of setattr(handler, ...) prevents the
+# data race where two concurrent coroutines both find the attribute absent,
+# both build the map, and both write it to the same shared function object.
+# With this dict, the worst case is two coroutines build an identical map and
+# one overwrites the other — both are correct, and the dict assignment is
+# atomic in CPython.
+_handler_data_maps: Dict[int, Dict[str, str]] = {}
+
 
 class HelperData(BaseModel):
     """Pydantic model for PatchHelper data validation."""
@@ -118,19 +133,35 @@ async def create_key(parsed_update: Update, client: Client) -> str:
 
 
 def _validate_telegram_id(id_value: int) -> bool:
-    """Validate that a Telegram ID is reasonable.
+    """Validate that a Telegram ID falls within a realistic range.
 
-    Telegram IDs should be positive integers within a reasonable range.
-    User IDs are typically 5-10 digits, chat IDs can be negative for groups/channels.
+    The previous implementation accepted the full 64-bit signed integer range
+    (−2⁶³ … 2⁶³−1).  That is far too permissive: a crafted or malformed update
+    with ``from_user.id = -9223372036854775808`` would pass validation, produce
+    a nonsensical storage key, and could collide with legitimate keys or bypass
+    per-user rate limits.
+
+    Telegram ID ranges (as documented and observed in production):
+
+    * User IDs:          positive, currently up to ~7 × 10⁹ (growing)
+    * Bot IDs:           positive, same namespace as users
+    * Basic group IDs:   positive (shown as negative in old MTProto; Pyrogram
+                         normalises them)
+    * Supergroup / channel IDs: negative, prefixed with -100; representable as
+                         −100_000_000_000_000 … −1_000_000_000 (13-digit bound)
+    * Forum topic IDs:  small positive integers
+
+    We use a generous upper bound of 10¹³ for positive IDs and −10¹³ for
+    negative IDs to leave plenty of headroom for Telegram's growing ID space
+    while still rejecting values that cannot plausibly be real Telegram IDs.
     """
-    if not isinstance(id_value, int):
+    if not isinstance(id_value, int) or isinstance(id_value, bool):
         return False
 
-    # Telegram user IDs are positive and typically between 5-10 digits
-    # Chat IDs can be negative (for groups/channels) or positive (for users)
-    # Channel IDs can be -100XXXXXXXXXX, exceeding 32-bit range
-    # Allow IDs within 64-bit signed integer range
-    return -(2**63) <= id_value <= 2**63 - 1 and id_value != 0
+    _MAX_ID = 10 ** 13   # 10 trillion — well above any current Telegram ID
+    _MIN_ID = -(10 ** 13)
+
+    return _MIN_ID <= id_value <= _MAX_ID and id_value != 0
 
 
 class PatchHelper:
@@ -173,20 +204,18 @@ class PatchHelper:
 
     async def _get_data_for_handler(self, handler: Callable) -> Dict[str, Any]:
         """Prepare and validate data for handler based on its signature."""
-        
-        # Check for cached mapping
-        attr_name = "__pyrogram_patch_handler_data_map__"
-        data_map = getattr(handler, attr_name, None)
-        
+
+        handler_id = id(handler)
+        data_map = _handler_data_maps.get(handler_id)
+
         if data_map is None:
             try:
                 sig = inspect.signature(handler)
                 data_map = {}
-                
+
                 for param_name, param in sig.parameters.items():
                     annotation = param.annotation
-                    
-                    # Store injection rule
+
                     if annotation is FSMContext:
                         data_map[param_name] = "fsm_ctx"
                     elif annotation is PatchHelper:
@@ -200,15 +229,13 @@ class PatchHelper:
                             data_map[param_name] = "state_obj"
                     elif param_name in self._data:
                         data_map[param_name] = "data_custom"
-                
-                # Cache the mapping
-                try:
-                    setattr(handler, attr_name, data_map)
-                except (AttributeError, TypeError):
-                    pass
-                    
-            except Exception as e:
-                # Fallback to empty if signature fails
+
+                # Store in the module-level dict (atomic in CPython; safe under
+                # concurrent access — worst case two coroutines build the same
+                # map and one clobbers the other, both values are correct).
+                _handler_data_maps[handler_id] = data_map
+
+            except Exception:
                 data_map = {}
 
         # Construct kwargs based on mapping
@@ -304,18 +331,85 @@ class PatchHelper:
 
 
 
-    @property
-    async def data(self) -> Dict[str, Any]:
-        """Get the helper's validated data dictionary asynchronously."""
+    async def get_data(
+        self,
+        model: Optional[type] = None,
+    ) -> Any:
+        """Return the helper's data dictionary, optionally validated as a Pydantic model.
+
+        Args:
+            model: An optional Pydantic ``BaseModel`` subclass.  When provided
+                   the raw data dict is passed to the model constructor and the
+                   validated model instance is returned.  This gives full IDE
+                   autocomplete and automatic schema validation at the point of
+                   use instead of working with an untyped dict.
+
+        Returns:
+            A copy of the data dict when *model* is ``None``, or a validated
+            model instance when *model* is given.
+
+        Example::
+
+            class UserData(BaseModel):
+                name: str
+                age: int
+
+            user = await helper.get_data(model=UserData)
+            print(user.name)   # type-safe, IDE-autocompleted
+
+        Previously exposed as an (invalid) ``async`` property named ``data``;
+        use ``await helper.get_data()`` going forward.
+        """
         async with self._lock:
+            data_copy = self._data.copy()
+
+        if model is not None:
+            from pydantic import BaseModel as _BaseModel
+            if not (isinstance(model, type) and issubclass(model, _BaseModel)):
+                raise TypeError(
+                    f"get_data(model=...) expects a Pydantic BaseModel subclass, "
+                    f"got {model!r}"
+                )
+            return model(**data_copy)
+
+        return data_copy
+
+    async def set_data(self, **kwargs: Any) -> Dict[str, Any]:
+        """Replace the entire data dict with *kwargs* and sync to FSM storage.
+
+        Unlike ``update_data`` (which merges), this overwrites all existing
+        keys.  Useful when you want a clean slate rather than an incremental
+        update.
+
+        Returns:
+            A copy of the new data dict.
+        """
+        if self._fsm_ctx is not None:
+            try:
+                # Clear existing data then set the new values atomically.
+                await self._fsm_ctx.clear_data()
+                if kwargs:
+                    await self._fsm_ctx.update_data(**kwargs)
+            except Exception as e:
+                raise errors.FSMTransitionError(
+                    "Failed to sync set_data to FSM", cause=e
+                ) from e
+
+        async with self._lock:
+            self._data.clear()
+            self._data.update(kwargs)
             return self._data.copy()
 
     async def update_data(self, **kwargs: Any) -> Dict[str, Any]:
-        """Update the helper's data with validation and FSM sync."""
-        async with self._lock:
-            self._data.update(kwargs)
-            logger.debug("Updated patch_helper data with %d keys", len(kwargs))
+        """Merge *kwargs* into the helper's data dict and return the new dict.
 
+        Order of operations (R-3 fix):
+        1. Write to FSM storage first (durable, CAS-safe via FSMContext).
+        2. Only update the in-memory dict after the storage write succeeds.
+
+        If the FSM write fails the in-memory dict is left unchanged, keeping
+        the two sources in sync.  Callers receive a copy, not a live reference.
+        """
         if self._fsm_ctx is not None:
             try:
                 await self._fsm_ctx.update_data(**kwargs)
@@ -324,7 +418,10 @@ class PatchHelper:
                     "Failed to sync data to FSM", cause=e
                 ) from e
 
-        return self._data
+        async with self._lock:
+            self._data.update(kwargs)
+            logger.debug("Updated patch_helper data with %d keys", len(kwargs))
+            return self._data.copy()
 
     async def set_state(self, state: str) -> None:
         """Set the FSM state.

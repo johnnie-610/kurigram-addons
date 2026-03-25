@@ -248,7 +248,15 @@ class PatchedDispatcher(Dispatcher):
             if not await handler.check(self.client, update_to_check):
                 return False
 
-            # Wrap the entire handler execution in the middleware chain
+            # Run per-handler middleware chain first (F-4).
+            # These are middlewares attached directly to the handler function
+            # via @use_middleware(...) — they execute before the global chain.
+            from pyrogram_patch.middlewares.per_handler import run_handler_middlewares
+            await run_handler_middlewares(
+                handler.callback, parsed_update, self.client, patch_helper
+            )
+
+            # Wrap the remaining execution in the global middleware chain
             chain_executor = self.pool._middleware_manager.wrap_handler(
                 handler.callback,
                 parsed_update,
@@ -257,7 +265,18 @@ class PatchedDispatcher(Dispatcher):
             )
 
             kwargs = await patch_helper._get_data_for_handler(handler.callback)
-            
+
+            # Merge DI-injected dependencies if a container is attached (F-9)
+            di_container = getattr(self.client, "_di_container", None)
+            if di_container is not None:
+                try:
+                    di_kwargs = await di_container.inject(
+                        handler.callback, parsed_update, self.client, patch_helper
+                    )
+                    kwargs.update(di_kwargs)
+                except Exception as di_exc:
+                    log.warning("DI injection failed: %s", di_exc)
+
             # The chain returns the result of the handler
             await chain_executor(**kwargs)
 

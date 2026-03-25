@@ -85,6 +85,7 @@ if TYPE_CHECKING:
     from pyrogram import Client
     from pyrogram.types import CallbackQuery, Message
 
+    from pyrogram_patch.fsm.filter import StateFilter
     from pyrogram_patch.patch_helper import PatchHelper
 
 logger = logging.getLogger("kurigram.conversation")
@@ -102,7 +103,6 @@ class ConversationContext:
         message: The incoming message (None for callback-triggered hooks).
         callback_query: The incoming callback query (None for message hooks).
         helper: The PatchHelper (FSM context) for this chat.
-        data: Shortcut to ``await helper.get_data()`` result (populated lazily).
     """
 
     client: "Client"
@@ -133,6 +133,50 @@ class ConversationContext:
         if self.callback_query:
             return self.callback_query.from_user.id
         raise ValueError("No user context available")
+
+    async def get_data(self, model: Optional[type] = None) -> Any:
+        """Return the FSM data dict for this conversation, fetched lazily.
+
+        The result is cached in ``_data`` so repeated calls within the same
+        hook invocation do not hit storage multiple times.
+
+        Args:
+            model: An optional Pydantic ``BaseModel`` subclass.  When given,
+                   the raw dict is passed to the model constructor and the
+                   validated model instance is returned — providing IDE
+                   autocomplete and schema validation.
+
+        Returns:
+            A dict (or model instance) with the current FSM data, or an empty
+            dict if no helper is available.
+
+        Example::
+
+            class UserData(BaseModel):
+                name: str
+                age: int
+
+            @name.on_message
+            async def save_name(self, ctx):
+                user = await ctx.get_data(model=UserData)
+                print(user.name)
+        """
+        if self._data is None:
+            if self.helper is not None:
+                self._data = await self.helper.get_data()
+            else:
+                self._data = {}
+
+        if model is not None:
+            from pydantic import BaseModel as _BaseModel
+            if not (isinstance(model, type) and issubclass(model, _BaseModel)):
+                raise TypeError(
+                    f"get_data(model=...) expects a Pydantic BaseModel subclass, "
+                    f"got {model!r}"
+                )
+            return model(**self._data)
+
+        return dict(self._data)
 
 
 # State descriptor
@@ -203,6 +247,22 @@ class ConversationState:
 
     def __repr__(self) -> str:
         return f"<ConversationState {self.state_string}>"
+
+    def filter(self) -> "StateFilter":
+        """Return a :class:`~pyrogram_patch.fsm.filter.StateFilter` bound to this state.
+
+        Allows the ergonomic shorthand::
+
+            @router.on_message(Registration.name.filter())
+            async def handler(client, message, patch_helper): ...
+
+        instead of the stringly-typed::
+
+            @router.on_message(StateFilter("Registration:name"))
+            async def handler(client, message, patch_helper): ...
+        """
+        from pyrogram_patch.fsm.filter import StateFilter
+        return StateFilter(self.state_string)
 
 
 # Conversation metaclass
@@ -302,12 +362,37 @@ class Conversation(metaclass=ConversationMeta):
     The class is instantiated once per inclusion and shared across all
     handlers. State is managed through the FSM storage, not instance
     variables.
+
+    Class attributes:
+        timeout: Seconds of inactivity after which the conversation is
+                 automatically finished.  Set to ``0`` or ``None`` to disable
+                 (default).  Implemented by passing a TTL to the FSM storage
+                 key on every state transition — if the user doesn't respond
+                 within *timeout* seconds the state key expires and the next
+                 update finds no active state, effectively ending the flow.
+
+    Example::
+
+        class Registration(Conversation):
+            timeout = 300   # auto-finish after 5 minutes of inactivity
+            name = ConversationState(initial=True)
+            ...
     """
 
     # Populated by metaclass
     _conv_states: ClassVar[Dict[str, ConversationState]]
     _conv_initial: ClassVar[ConversationState]
     _conv_hooks: ClassVar[Dict[str, Dict[str, str]]]
+
+    # Optional inactivity timeout in seconds (0 or None = no timeout)
+    timeout: ClassVar[Optional[int]] = None
+
+    def _ttl(self) -> Optional[int]:
+        """Return the TTL for state transitions, or None if no timeout."""
+        t = self.__class__.timeout
+        if t and int(t) > 0:
+            return int(t)
+        return None
 
     async def goto(
         self, ctx: ConversationContext, state: ConversationState
@@ -324,12 +409,19 @@ class Conversation(metaclass=ConversationMeta):
                 f"{self.__class__.__name__}"
             )
 
-        # Set FSM state
+        # Set FSM state — pass TTL so the key auto-expires on inactivity.
         if ctx.helper:
-            await ctx.helper.set_state(state.state_string)
+            ttl = self._ttl()
+            if ttl and ctx.helper._fsm_ctx is not None:
+                await ctx.helper._fsm_ctx.set_state(state.state_string, ttl=ttl)
+            else:
+                await ctx.helper.set_state(state.state_string)
 
         logger.debug(
-            "%s: transition -> %s", self.__class__.__name__, state._name
+            "%s: transition -> %s (ttl=%s)",
+            self.__class__.__name__,
+            state._name,
+            self._ttl(),
         )
 
         # Call on_enter hook if defined

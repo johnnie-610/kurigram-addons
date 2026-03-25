@@ -41,6 +41,27 @@ class CircuitBreakerConfig(BaseSettings):
         description="Message sent to end users when a circuit breaker is open",
     )
 
+    @field_validator("fallback_message")
+    @classmethod
+    def validate_fallback_message(cls, v: str) -> str:
+        """Validate the fallback message sent to users when the circuit is open.
+
+        The value is settable via the ``PYROGRAM_PATCH_CB_FALLBACK_MESSAGE``
+        environment variable.  Without validation, an injected env var (e.g.
+        from a compromised CI/CD pipeline) could send arbitrary content to
+        every user of the bot.  We enforce a 200-character cap and strip
+        leading/trailing whitespace.
+        """
+        v = v.strip()
+        if not v:
+            raise ValueError("fallback_message must not be empty")
+        if len(v) > 200:
+            raise ValueError(
+                f"fallback_message must be 200 characters or fewer "
+                f"(got {len(v)})"
+            )
+        return v
+
     model_config = ConfigDict(env_prefix="PYROGRAM_PATCH_CB_")
 
 

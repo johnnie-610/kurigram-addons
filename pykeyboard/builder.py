@@ -104,7 +104,16 @@ class KeyboardBuilder:
                         reason="Text produces no valid callback_data after sanitisation",
                     )
                 if len(callback_data.encode("utf-8")) > TELEGRAM_CALLBACK_DATA_LIMIT:
-                    callback_data = callback_data[:TELEGRAM_CALLBACK_DATA_LIMIT]
+                    # Truncate at the byte level, not the character level.
+                    # A single non-ASCII character (e.g. Cyrillic, CJK) can be
+                    # 2–4 bytes, so slicing by character count can produce a
+                    # string that exceeds Telegram's 64-byte limit.
+                    # errors="ignore" drops any partial multi-byte character at
+                    # the cut point, guaranteeing valid UTF-8 output.
+                    encoded = callback_data.encode("utf-8")
+                    callback_data = encoded[:TELEGRAM_CALLBACK_DATA_LIMIT].decode(
+                        "utf-8", errors="ignore"
+                    )
                 return InlineButton(text=btn_spec, callback_data=callback_data)
             else:
                 return ReplyButton(text=btn_spec)

@@ -86,8 +86,15 @@ class AsyncCircuitBreaker(Generic[T]):
         self.last_failure_time: Optional[float] = None
         self._lock = asyncio.Lock()
 
-    async def _should_attempt_reset(self) -> bool:
-        """Check if enough time has passed to attempt a reset."""
+    def _should_attempt_reset(self) -> bool:
+        """Check if enough time has passed to attempt a reset.
+
+        Deliberately synchronous: this method only reads a float and compares
+        it against the wall clock.  It must never become async — it is called
+        while ``self._lock`` is held, and acquiring the lock again inside an
+        awaited coroutine would deadlock (``_record_success`` / ``_record_failure``
+        also acquire the same lock).
+        """
         if self.last_failure_time is None:
             return False
         return (
@@ -142,7 +149,7 @@ class AsyncCircuitBreaker(Generic[T]):
         """
         async with self._lock:
             if self.state == CircuitState.OPEN:
-                if await self._should_attempt_reset():
+                if self._should_attempt_reset():
                     self.state = CircuitState.HALF_OPEN
                     logger.info("Circuit breaker half-open - testing recovery")
                 else:
@@ -180,7 +187,7 @@ class AsyncCircuitBreaker(Generic[T]):
         # so we must NOT hold it across the yield.
         async with self._lock:
             if self.state == CircuitState.OPEN:
-                if await self._should_attempt_reset():
+                if self._should_attempt_reset():
                     self.state = CircuitState.HALF_OPEN
                     logger.info("Circuit breaker half-open - testing recovery")
                 else:
@@ -210,23 +217,42 @@ class AsyncCircuitBreaker(Generic[T]):
         }
 
 
-# Global circuit breaker instances for different storage types
+# ---------------------------------------------------------------------------
+# Global circuit breaker registry
+#
+# DEPRECATED — do not use get_circuit_breaker() for new code.
+#
+# The registry is process-global: all Client instances share the same breaker
+# for a given name.  In multi-account bots this means a Redis failure for one
+# client trips the breaker and blocks every other client's storage operations.
+#
+# The correct pattern is to instantiate AsyncCircuitBreaker directly inside
+# each storage backend instance (see RedisStorage.__init__).  The registry
+# and get_circuit_breaker() are kept only for backwards compatibility and will
+# be removed in a future major version.
+# ---------------------------------------------------------------------------
 _storage_circuit_breakers: dict = {}
 
 
 def get_circuit_breaker(
     name: str, config: Optional[CircuitBreakerConfig] = None
 ) -> AsyncCircuitBreaker:
-    """
-    Get or create a circuit breaker for a specific storage type.
+    """Get or create a **process-global** circuit breaker by name.
 
-    Args:
-        name: Identifier for the circuit breaker (e.g., 'redis', 'memory')
-        config: Optional configuration
-
-    Returns:
-        AsyncCircuitBreaker instance
+    .. deprecated::
+        This function returns a shared breaker that is visible to all Client
+        instances in the same process.  Prefer instantiating
+        ``AsyncCircuitBreaker`` directly inside your storage class so each
+        storage instance owns its own isolated breaker.
     """
+    import warnings
+    warnings.warn(
+        "get_circuit_breaker() returns a process-global circuit breaker shared "
+        "across all Client instances.  Instantiate AsyncCircuitBreaker directly "
+        "inside your storage class instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if name not in _storage_circuit_breakers:
         _storage_circuit_breakers[name] = AsyncCircuitBreaker(config)
     return _storage_circuit_breakers[name]

@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import typing
 import uuid
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -29,6 +30,30 @@ AsyncAfter = Callable[[Any], Awaitable[None]]
 
 
 @dataclass
+class MiddlewareContext:
+    """Single-argument context object passed to the new middleware signature.
+
+    The preferred way to write a middleware is::
+
+        async def my_middleware(ctx: MiddlewareContext) -> None:
+            print(ctx.update, ctx.client, ctx.helper)
+
+    This replaces the fragile parameter-name sniffing used by the previous
+    API (where a middleware named ``(update, ctx)`` instead of
+    ``(update, patch_helper)`` would silently receive ``None`` for the
+    second argument with no error).
+
+    The old positional signatures are still fully supported for backwards
+    compatibility — the dispatcher detects which calling convention to use
+    by inspecting the first parameter's type annotation at registration time.
+    """
+
+    update: Any
+    client: Any
+    helper: Any  # PatchHelper instance, or None if not in a patched context
+
+
+@dataclass
 class MiddlewareEntry:
     id: str
     kind: str  # 'before' | 'after' | 'around'
@@ -40,6 +65,9 @@ class MiddlewareEntry:
     has_client_param: bool = False
     has_helper_param: bool = False
     has_handler_param: bool = False
+    # True when the first parameter is annotated as MiddlewareContext —
+    # triggers the new single-argument calling convention.
+    uses_context_object: bool = False
     timeout: Optional[float] = None
 
 
@@ -182,8 +210,69 @@ class MiddlewareManager:
 
         # Cache signature and analyze parameters
         try:
-            signature = inspect.signature(fn)
-            param_count = len(signature.parameters)
+            # Handle callable classes (instances with __call__ method) FIRST
+            # to avoid accessing __globals__ on instances
+            is_callable_instance = False
+            if (not callable(fn) and hasattr(fn, '__call__')) or (
+                callable(fn) and hasattr(fn, '__call__') and 
+                hasattr(fn, '__class__') and hasattr(fn.__class__, '__call__') and
+                not inspect.isfunction(fn) and not inspect.ismethod(fn)
+            ):
+                # If it's a class with __call__, create an instance first
+                if not callable(fn):
+                    try:
+                        fn = fn()
+                    except Exception as e:
+                        logger.debug("Failed to create instance of callable class: %s", e)
+                        pass
+                
+                # For callable instances, inspect the __call__ method
+                try:
+                    signature = inspect.signature(fn.__call__)
+                    param_count = len(signature.parameters)
+                    params = list(signature.parameters.values())
+                    is_callable_instance = True
+                    
+                    # Re-check for MiddlewareContext annotation
+                    if params:
+                        first_ann = params[0].annotation
+                        fn_name = getattr(fn, '__name__', type(fn).__name__)
+                        logger.debug("Middleware %s first param annotation: %r (type: %s)", fn_name, first_ann, type(first_ann))
+                        # For instances, we can't resolve string annotations in globals
+                        # so we just leave it as string and it won't match
+                        if isinstance(first_ann, str):
+                            pass
+                        if first_ann is MiddlewareContext:
+                            uses_context_object = True
+                            logger.debug("Middleware %s (instance) uses_context_object=True (annotation match)", fn_name)
+                except Exception as e:
+                    logger.debug("Failed to inspect callable instance: %s", e)
+                    pass
+            
+            # If not a callable instance, do the normal signature inspection
+            if not is_callable_instance:
+                signature = inspect.signature(fn)
+                param_count = len(signature.parameters)
+                params = list(signature.parameters.values())
+
+            # Detect the new MiddlewareContext calling convention:
+            # the middleware has exactly one parameter annotated as
+            # MiddlewareContext (or named "ctx" with that annotation).
+            uses_context_object = False
+            if not is_callable_instance and params:
+                first_ann = params[0].annotation
+                fn_name = getattr(fn, '__name__', type(fn).__name__)
+                # If the annotation is a string, try to resolve it in the function's global namespace.
+                if isinstance(first_ann, str):
+                    try:
+                        first_ann = fn.__globals__[first_ann]
+                    except KeyError:
+                        # If we can't resolve, leave it as string and it won't match.
+                        pass
+                if first_ann is MiddlewareContext:
+                    uses_context_object = True
+                    logger.debug("Middleware %s uses_context_object=True (annotation match)", fn_name)
+
             has_update = "update" in signature.parameters
             has_client = "client" in signature.parameters
             has_helper = (
@@ -194,17 +283,14 @@ class MiddlewareManager:
                 p in signature.parameters
                 for p in ("handler", "next_handler", "next")
             )
-            # If it's 'around' and no handler was found by name, 
-            # and it has at least 1-2 params, assume the first one IS the handler
-            # unless it's explicitly 'update'.
             if kind == "around" and not has_handler and param_count > 0:
-                first_param = list(signature.parameters.values())[0]
+                first_param = params[0]
                 if first_param.name != "update":
                     has_handler = True
         except (ValueError, TypeError):
-            # Fallback for callables without proper signature
             signature = None
             param_count = 0
+            uses_context_object = False
             has_update = has_client = has_helper = has_handler = False
 
         entry = MiddlewareEntry(
@@ -218,6 +304,7 @@ class MiddlewareManager:
             has_client_param=has_client,
             has_helper_param=has_helper,
             has_handler_param=has_handler,
+            uses_context_object=uses_context_object,
             timeout=timeout,
         )
 
@@ -264,7 +351,22 @@ class MiddlewareManager:
         *args,
         **kwargs,
     ) -> Any:
-        """Execute a middleware using cached signature information for optimal performance."""
+        """Execute a middleware using cached signature information.
+
+        Supports two calling conventions:
+
+        **New (preferred)** — single ``MiddlewareContext`` argument::
+
+            async def my_middleware(ctx: MiddlewareContext) -> None:
+                print(ctx.update, ctx.client, ctx.helper)
+
+        **Legacy** — positional parameter-name detection (still fully
+        supported for backwards compatibility)::
+
+            async def my_middleware(update, client, patch_helper) -> None: ...
+            async def my_middleware(update, patch_helper) -> None: ...
+            async def my_middleware(update) -> None: ...
+        """
         try:
             from pyrogram_patch.config import get_config
             default_timeout = get_config().middleware.max_execution_time
@@ -275,60 +377,64 @@ class MiddlewareManager:
             )
 
             async with asyncio.timeout(timeout):
-                # For 'around' middleware, we must pass the next_handler
+                # ── New convention: single MiddlewareContext argument ──────
+                if middleware.uses_context_object:
+                    ctx = MiddlewareContext(
+                        update=update,
+                        client=client,
+                        helper=helper,
+                    )
+                    logger.debug(
+                        f"MiddlewareContext created: update={type(update)}, client={type(client)}, helper={type(helper)}"
+                    )
+                    logger.debug(
+                        f"MiddlewareContext values: update={type(ctx.update)}, client={type(ctx.client)}, helper={type(ctx.helper)}"
+                    )
+                    if middleware.kind == "around":
+                        if next_handler is None:
+                            raise errors.MiddlewareError(
+                                "Around middleware requires a next_handler"
+                            )
+                        async def wrapped_next():
+                            return await next_handler(*args, **kwargs)
+                        return await middleware.fn(wrapped_next, ctx)
+                    return await middleware.fn(ctx)
+
+                # ── Legacy convention: positional / name-sniffed args ──────
                 if middleware.kind == "around":
                     if next_handler is None:
                         raise errors.MiddlewareError(
                             "Around middleware requires a next_handler"
                         )
 
-                    # Prepare arguments for the middleware function
                     mid_kwargs = {}
                     if middleware.has_client_param and client is not None:
                         mid_kwargs["client"] = client
                     if middleware.has_helper_param and helper is not None:
-                        mid_kwargs["patch_helper"] = helper or getattr(
-                            helper, "helper", helper
-                        )
+                        mid_kwargs["patch_helper"] = helper
 
-                    # Create a wrapper for the next handler in the chain
                     async def wrapped_next():
                         return await next_handler(*args, **kwargs)
 
-                    # Robust calling based on parameter detection
                     if middleware.has_handler_param:
-                        # Standard around middleware: (handler, update, ...)
-                        # We pass both positionally to avoid complex mapping
                         return await middleware.fn(wrapped_next, update, **mid_kwargs)
                     else:
-                        # Fallback for around middleware without explicit handler param.
-                        # This happens if it was registered as around but shaped like before/after.
-                        # We call the middleware, and MUST call wrapped_next to continue the chain.
                         try:
-                            # Try to call as a regular hook
                             result = await middleware.fn(update, **mid_kwargs)
-                            # Continue the chain because this mid didn't take ctrl of it
                             await wrapped_next()
                             return result
                         except TypeError:
-                            # Extreme fallback: try positional
-                            # This might still fail but we've tried our best
                             result = await middleware.fn(update, client, helper)
                             await wrapped_next()
                             return result
 
-                # Use cached parameter analysis to call with correct signature for before/after
                 if middleware.has_client_param and middleware.has_helper_param:
-                    # Optimized positional call for (update, client, helper)
                     return await middleware.fn(update, client, helper)
                 elif middleware.has_helper_param:
-                    # Optimized positional call for (update, helper)
                     return await middleware.fn(update, helper)
                 elif middleware.has_client_param:
-                    # Optimized positional call for (update, client)
                     return await middleware.fn(update, client)
                 else:
-                    # Default: (update)
                     return await middleware.fn(update)
 
         except TimeoutError:
@@ -349,10 +455,7 @@ class MiddlewareManager:
             if middleware.kind == "around" and next_handler:
                 async def wrapped_next():
                     return await next_handler(*args, **kwargs)
-                
-                # Try passing wrapped_next if it seems to take it as first arg
                 try:
-                    # Use flags for smarter fallback
                     if middleware.has_client_param and middleware.has_helper_param:
                         return await middleware.fn(wrapped_next, update, client, helper)
                     elif middleware.has_helper_param:
@@ -360,7 +463,6 @@ class MiddlewareManager:
                     else:
                         return await middleware.fn(wrapped_next, update, client)
                 except TypeError:
-                    # Final fallback for around without wrapped_next handling
                     if middleware.has_helper_param:
                         return await middleware.fn(update, helper)
                     return await middleware.fn(update, client)
@@ -370,7 +472,7 @@ class MiddlewareManager:
                     return await middleware.fn(update, helper)
                 except TypeError:
                     pass
-            
+
             if middleware.has_client_param:
                 try:
                     return await middleware.fn(update, client)

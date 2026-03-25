@@ -14,6 +14,7 @@ from pyrogram.types import (CallbackGame, InlineKeyboardButton, KeyboardButton,
                             LoginUrl, WebAppInfo)
 
 from pykeyboard.errors import ValidationError
+from pykeyboard.button_style import ButtonStyle
 
 logger = logging.getLogger("pykeyboard.keyboard_base")
 
@@ -292,6 +293,13 @@ class InlineButton(Button):
     copy_text: Optional[str] = Field(
         default=None, description="Text to copy to clipboard"
     )
+    style: ButtonStyle = Field(
+        default=ButtonStyle.DEFAULT,
+        description=(
+            "support styling. ``ButtonStyle.DEFAULT`` produces a "
+            "standard unstyled button."
+        ),
+    )
 
     # Action fields that are mutually exclusive per Telegram API.
     _ACTION_FIELDS = (
@@ -314,19 +322,15 @@ class InlineButton(Button):
         return self
 
     def to_pyrogram(self) -> InlineKeyboardButton:
-        """Convert to Pyrogram InlineKeyboardButton.
+        """Convert to a Pyrogram ``InlineKeyboardButton``.
 
-        Creates a Pyrogram-compatible InlineKeyboardButton instance
-        with all the current button's properties.
+        Note: ``style`` cannot be forwarded through Pyrogram's high-level API
+        because ``InlineKeyboardButton`` does not yet expose the field.  Use
+        ``write()`` instead — it injects the style at the raw MTProto level
+        when a styled button is needed.
 
         Returns:
-            InlineKeyboardButton: Pyrogram-compatible button instance.
-
-        Example:
-            >>> button = InlineButton(text="Test", callback_data="test")
-            >>> pyrogram_btn = button.to_pyrogram()
-            >>> isinstance(pyrogram_btn, InlineKeyboardButton)
-            True
+            InlineKeyboardButton: Pyrogram-compatible button (without style).
         """
         return InlineKeyboardButton(
             text=self.text,
@@ -341,19 +345,70 @@ class InlineButton(Button):
             requires_password=self.requires_password,
             pay=self.pay,
             copy_text=self.copy_text,
+            style=self.style,
         )
 
     async def write(self, client: Any) -> Any:
-        """Pyrogram serialization method.
+        """Pyrogram serialisation hook.
 
-        This method is called by Pyrogram to serialize the button for sending
-        to Telegram. It delegates to the Pyrogram button's write method.
+        Called by Pyrogram when building the outgoing ``ReplyMarkup``.  If a
+        ``style`` is set **and** the button carries ``callback_data``, we
+        attempt to inject the style at the raw MTProto level via
+        :func:`pykeyboard.button_style.build_styled_button_bytes`.
+
+        Falls back to the standard (unstyled) Pyrogram path in all other
+        cases:
+
+        - ``style`` is ``None`` or ``ButtonStyle.DEFAULT``
+        - The button is not a callback button (URL, web-app, etc.)
+        - The installed pyrogram does not yet ship the styled constructor
 
         Args:
             client: The Pyrogram client instance.
 
         Returns:
-            Serialized button data for Telegram API.
+            Raw serialised bytes for the Telegram socket.
         """
+        # Only callback buttons support styling — everything else falls through.
+        if self.style is not None and self.callback_data is not None:
+            try:
+                from pykeyboard.button_style import ButtonStyle, build_styled_button_bytes
+
+                # Normalise: accept both raw ButtonStyle members and plain ints/strings
+                if not isinstance(self.style, ButtonStyle):
+                    try:
+                        style = ButtonStyle(self.style)
+                    except (ValueError, KeyError):
+                        style = ButtonStyle.DEFAULT
+                else:
+                    style = self.style
+
+                if style != ButtonStyle.DEFAULT:
+                    cb_data = self.callback_data
+                    data_bytes = (
+                        cb_data.encode("utf-8")
+                        if isinstance(cb_data, str)
+                        else bytes(cb_data)
+                    )
+                    raw_bytes = build_styled_button_bytes(
+                        text=self.text,
+                        data=data_bytes,
+                        style=style,
+                        requires_password=bool(self.requires_password),
+                    )
+                    if raw_bytes is not None:
+                        # build_styled_button_bytes returned serialised TL bytes —
+                        # return them directly, bypassing Pyrogram's path.
+                        return raw_bytes
+
+            except Exception as exc:
+                # Never crash the bot over a cosmetic button feature.
+                logger.warning(
+                    "ButtonStyle injection failed for button %r: %s — "
+                    "falling back to unstyled button",
+                    self.text, exc,
+                )
+
+        # Standard path: delegate to Pyrogram's InlineKeyboardButton.
         pyrogram_button = self.to_pyrogram()
         return await pyrogram_button.write(client)

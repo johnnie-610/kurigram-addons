@@ -131,6 +131,75 @@ class Router(PatchedDecorators):
 
         return decorator
 
+    def on_callback_data(
+        self,
+        pattern: str,
+        *,
+        group: int = 0,
+    ) -> Callable:
+        """Register a callback-query handler with regex capture group injection.
+
+        Named groups (``(?P<name>…)``) are extracted from the matched
+        ``callback_data`` and injected as keyword arguments into the handler.
+        Positional groups (``(…)``) are injected as ``group_1``, ``group_2``, …
+
+        This is similar to FastAPI path parameters — the handler declares
+        the values it needs and they are delivered automatically::
+
+            @router.on_callback_data(r"page:(?P<num>\\d+)")
+            async def paginate(client, query, num: int):
+                await query.answer(f"You're on page {num}")
+
+            @router.on_callback_data(r"item:(\\d+):(buy|sell)")
+            async def trade(client, query, group_1: int, group_2: str):
+                ...
+
+        Args:
+            pattern: A regex pattern matched against ``query.data``.  Must
+                     match the **full** string (anchored with ``^…$``
+                     automatically).
+            group: Handler group (default: 0).
+
+        Note:
+            Values injected from capture groups are always strings.  Cast
+            them explicitly (e.g. ``int(num)``) if you need a different type.
+            Alternatively, use :class:`~pykeyboard.CallbackData` which handles
+            type coercion automatically.
+        """
+        from pyrogram import filters as pyro_filters
+        import functools
+
+        anchored = f"^(?:{pattern})$"
+        compiled = re.compile(anchored)
+
+        def decorator(fn: Callable) -> Callable:
+            @functools.wraps(fn)
+            async def _wrapper(client: Any, query: Any, *args: Any, **kwargs: Any) -> Any:
+                data = getattr(query, "data", "") or ""
+                m = compiled.match(data)
+                if not m:
+                    return
+
+                # Inject named groups; fall back to positional group_N names
+                extra: Dict[str, Any] = {}
+                if m.lastindex:
+                    named = m.groupdict()
+                    if named:
+                        extra.update(named)
+                    else:
+                        for i, val in enumerate(m.groups(), start=1):
+                            extra[f"group_{i}"] = val
+
+                return await fn(client, query, *args, **{**kwargs, **extra})
+
+            # Register using a regex filter on the full anchored pattern
+            self.on_callback_query(
+                pyro_filters.regex(anchored), group=group
+            )(_wrapper)
+            return fn
+
+        return decorator
+
     def on_command(
         self,
         command: str,
@@ -447,10 +516,30 @@ class Router(PatchedDecorators):
         )
 
     def __enter__(self) -> "Router":
-        """Context manager entry."""
+        """Sync context manager entry (use ``async with`` for async cleanup)."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit with cleanup."""
+        """Sync context manager exit with cleanup."""
+        if self._is_registered:
+            self.unregister_handlers()
+
+    async def __aenter__(self) -> "Router":
+        """Async context manager entry.
+
+        Preferred over the sync form because the rest of the library is
+        async.  Handlers registered inside the block are unregistered on
+        exit, including when an exception is raised::
+
+            async with Router() as router:
+                @router.on_message()
+                async def handler(client, message): ...
+                router.set_client(app)
+            # handlers automatically unregistered here
+        """
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit — unregisters all handlers."""
         if self._is_registered:
             self.unregister_handlers()

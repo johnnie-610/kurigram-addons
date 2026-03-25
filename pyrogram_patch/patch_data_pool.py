@@ -14,7 +14,8 @@ import asyncio
 import logging
 import time
 import weakref
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
@@ -29,6 +30,35 @@ from pyrogram_patch.middlewares.middleware_manager import MiddlewareManager
 from pyrogram_patch.config import get_config
 
 logger = logging.getLogger("pyrogram_patch.patch_data_pool")
+
+
+@dataclass(frozen=True)
+class PoolStatistics:
+    """Typed snapshot of PatchDataPool operational metrics.
+
+    Returned by ``PatchDataPool.get_statistics()`` and exposed as
+    ``await app.stats()`` on :class:`~kurigram_addons.KurigramClient`.
+
+    All fields are read-only (``frozen=True``) so callers cannot accidentally
+    mutate them.
+
+    Attributes:
+        active_helpers: Number of helpers currently pooled (one per active update).
+        session_ttl: Configured TTL for helper sessions in seconds (0 = no TTL).
+        persist_helpers: Whether helper snapshots are persisted to FSM storage.
+        uptime: Seconds since the pool was initialised.
+        expired_helpers: Cumulative count of helpers removed due to TTL expiry.
+        total_helpers_created: Cumulative count of helpers ever created.
+        oldest_helper_age: Age in seconds of the oldest currently active helper.
+    """
+
+    active_helpers: int
+    session_ttl: float
+    persist_helpers: bool
+    uptime: float
+    expired_helpers: int
+    total_helpers_created: int
+    oldest_helper_age: float
 
 
 class PooledHelperData(BaseModel):
@@ -327,8 +357,8 @@ class PatchDataPool:
         """Get the current FSM storage."""
         return self._fsm_storage
 
-    async def get_statistics(self) -> Dict[str, Any]:
-        """Return operational statistics for the helper pool."""
+    async def get_statistics(self) -> PoolStatistics:
+        """Return a typed snapshot of operational metrics for the helper pool."""
 
         async with self._lock:
             now = time.time()
@@ -339,15 +369,15 @@ class PatchDataPool:
                     now - data.timestamp for data in self._helpers.values()
                 )
 
-            return {
-                "active_helpers": active,
-                "session_ttl": self._session_ttl,
-                "persist_helpers": self._persist_helpers,
-                "uptime": now - self._started_at,
-                "expired_helpers": self._expired_helper_count,
-                "total_helpers_created": self._total_helpers_created,
-                "oldest_helper_age": oldest_age,
-            }
+            return PoolStatistics(
+                active_helpers=active,
+                session_ttl=self._session_ttl,
+                persist_helpers=self._persist_helpers,
+                uptime=now - self._started_at,
+                expired_helpers=self._expired_helper_count,
+                total_helpers_created=self._total_helpers_created,
+                oldest_helper_age=oldest_age,
+            )
 
     # Middleware integration
     async def add_middleware(
@@ -414,6 +444,11 @@ class PatchDataPool:
 # Global pool initialization
 global_pool: Optional[PatchDataPool] = None
 
+# Singleton lock — reuse the same lock across init/reset calls so there is
+# never a window where a second coroutine can sneak in between clear_all()
+# and the next initialize_global_pool() call.
+_global_pool_lock: asyncio.Lock = asyncio.Lock()
+
 
 async def initialize_global_pool(
     client: Optional[Client] = None,
@@ -431,8 +466,24 @@ async def initialize_global_pool(
     """
     global global_pool
     if global_pool is None:
-        try:
-            global_pool = await PatchDataPool.get_instance()
-        except Exception as e:
-            raise PatchError("Failed to initialize global pool", cause=e) from e
+        async with _global_pool_lock:
+            if global_pool is None:
+                try:
+                    global_pool = await PatchDataPool.get_instance()
+                except Exception as e:
+                    raise PatchError("Failed to initialize global pool", cause=e) from e
     return global_pool
+
+
+def reset_global_pool() -> None:
+    """Reset the module-level pool reference so the next call to
+    ``initialize_global_pool()`` creates a fresh instance.
+
+    Must be called after ``pool.clear_all()`` inside ``unpatch()`` /
+    ``KurigramClient.stop()`` so that re-patching or restarting the client
+    does not reuse a cleared pool with missing storage and zeroed state.
+    """
+    global global_pool
+    # Also reset PatchDataPool's singleton so get_instance() rebuilds it.
+    PatchDataPool._instance = None
+    global_pool = None

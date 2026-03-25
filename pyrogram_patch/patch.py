@@ -16,7 +16,7 @@ from pyrogram import Client
 from pyrogram_patch import errors
 from pyrogram_patch.dispatcher import PatchedDispatcher
 from pyrogram_patch.fsm.base_storage import BaseStorage
-from pyrogram_patch.patch_data_pool import PatchDataPool, initialize_global_pool
+from pyrogram_patch.patch_data_pool import PatchDataPool, initialize_global_pool, reset_global_pool
 from pyrogram_patch.router import Router
 
 if TYPE_CHECKING:
@@ -186,10 +186,22 @@ class PatchManager:
 async def patch(app: Client) -> PatchManager:
     """Async apply patches to a Pyrogram client and initialize pool.
 
-    This function:
-    1. Replaces the default dispatcher with PatchedDispatcher
-    2. Initializes the global PatchDataPool asynchronously
-    3. Returns a PatchManager for configuration
+    .. deprecated::
+        ``patch()`` / ``unpatch()`` are deprecated in favour of
+        :class:`kurigram_addons.KurigramClient`, which handles all
+        initialisation, storage lifecycle, and cleanup automatically::
+
+            from kurigram_addons import KurigramClient, MemoryStorage
+
+            app = KurigramClient(
+                "my_bot",
+                api_id=...,
+                api_hash="...",
+                storage=MemoryStorage(),
+            )
+            app.run()
+
+        ``patch()`` will be removed in the next major version.
 
     Args:
         app: The Pyrogram Client instance to patch.
@@ -200,19 +212,15 @@ async def patch(app: Client) -> PatchManager:
     Raises:
         TypeError: If app is not a Client.
         PatchError: If client already patched or initialization fails.
-
-    Example:
-        >>> import asyncio
-        >>> from pyrogram import Client
-        >>> from pyrogram_patch import patch
-        >>>
-        >>> async def main():
-        ...     app = Client("my_account")
-        ...     manager = await patch(app)
-        ...     # Now configure: await manager.set_storage(storage)
-        ...     await app.start()
-        >>> asyncio.run(main())
     """
+    import warnings
+    warnings.warn(
+        "patch() is deprecated and will be removed in the next major version. "
+        "Use KurigramClient instead: "
+        "https://github.com/johnnie/kurigram-addons#getting-started",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not isinstance(app, Client):
         raise TypeError(f"Expected Client instance, got {type(app).__name__}")
 
@@ -248,6 +256,11 @@ async def patch(app: Client) -> PatchManager:
 async def unpatch(app: Client) -> None:
     """Async revert patches and clean up pool/resources.
 
+    .. deprecated::
+        Use :class:`kurigram_addons.KurigramClient` instead of
+        ``patch()`` / ``unpatch()``.  ``unpatch()`` will be removed in the
+        next major version.
+
     Args:
         app: The Pyrogram Client to unpatch.
 
@@ -255,6 +268,13 @@ async def unpatch(app: Client) -> None:
         RuntimeError: If client not patched.
         PatchError: If cleanup fails (original dispatcher missing or pool issues).
     """
+    import warnings
+    warnings.warn(
+        "unpatch() is deprecated and will be removed in the next major version. "
+        "Use KurigramClient instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not getattr(app, "_patched", False):
         raise RuntimeError("This client has not been patched")
 
@@ -268,6 +288,10 @@ async def unpatch(app: Client) -> None:
         # Clean pool if accessible
         if hasattr(app, "_pool") and app._pool:
             await app._pool.clear_all()
+
+        # Reset the module-level singleton so that a subsequent patch() call
+        # creates a completely fresh pool rather than reusing the cleared one.
+        reset_global_pool()
 
         # Final cleanup
         del app._original_dispatcher

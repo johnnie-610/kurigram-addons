@@ -16,6 +16,7 @@ from pyrogram.types import (ForceReply, KeyboardButton, KeyboardButtonPollType,
                             ReplyKeyboardRemove, WebAppInfo)
 
 from .keyboard_base import Button, KeyboardBase
+from .button_style import ButtonStyle
 
 logger = logging.getLogger("pykeyboard.reply_keyboard")
 
@@ -221,6 +222,9 @@ class ReplyButton(Button):
         None, description="Request chat"
     )
     web_app: Optional[WebAppInfo] = Field(None, description="Web app to open")
+    style: ButtonStyle = Field(
+        ButtonStyle.DEFAULT, description="Button style (for styled keyboards)"
+    )
 
     def to_pyrogram(self) -> KeyboardButton:
         """Convert to Pyrogram KeyboardButton.
@@ -245,6 +249,7 @@ class ReplyButton(Button):
             request_users=self.request_users,
             request_chat=self.request_chat,
             web_app=self.web_app,
+            style=self.style,
         )
 
     def write(self) -> Any:

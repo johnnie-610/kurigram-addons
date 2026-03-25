@@ -106,13 +106,23 @@ class FSMContextManager:
                             )
 
                 if chat_id:
-                    # Preferred: chat-scoped state
+                    # Preferred: chat-scoped state (user+chat pair is most specific
+                    # but chat alone is correct for group/channel FSM flows).
                     identifier = f"chat:{chat_id}"
                 elif user_id:
-                    # Fallback: user-scoped state
+                    # Fallback: user-scoped state (private chats, inline queries)
                     identifier = f"user:{user_id}"
                 else:
-                    identifier = "global"
+                    # Cannot determine a meaningful identifier.  Falling back to a
+                    # shared literal like "global" would cause every unidentifiable
+                    # update — across all users — to share one FSM state, silently
+                    # corrupting each other's conversations.  Raise instead.
+                    raise errors.FSMContextError(
+                        "Cannot determine FSM identifier: update has no chat or "
+                        "user ID.  If you are handling a custom update type, pass "
+                        "an identifier_getter to FSMContextManager.",
+                        context={"update_type": type(update).__name__},
+                    )
 
             return FSMContext(self._storage, identifier)
         except errors.PyrogramPatchError:
