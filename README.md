@@ -20,6 +20,8 @@
 
 ## ✨ What's new in v0.5.0
 
+<strong><em>Please Note the dev branch is not usable at all</em></strong>
+
 This release is the largest since v0.4.0. It fixes every known correctness bug, hardens concurrency, and adds new features.
 
 **Bug fixes**
@@ -203,7 +205,7 @@ async def any_page(client, query): ...
 async def first_page(client, query): ...
 ```
 
-**Supported field types:** `str`, `int`, `float`, `bool`.  
+**Supported field types:** `str`, `int`, `float`, `bool`.
 `pack()` raises `ValueError` if the encoded string exceeds Telegram's 64-byte limit.
 
 ---
