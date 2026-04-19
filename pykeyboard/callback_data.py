@@ -38,8 +38,10 @@ from __future__ import annotations
 
 import re
 from typing import Any, ClassVar, Dict, Optional, Type, TypeVar
-from .button_style import ButtonStyle
 from pyrogram import filters
+from pyrogram.types import InlineKeyboardButton
+from pyrogram.enums import ButtonStyle
+
 
 T = TypeVar("T", bound="CallbackData")
 
@@ -205,20 +207,17 @@ class CallbackData(metaclass=CallbackDataMeta):
 
         Args:
             text: Button label displayed to the user.
-            style: Optional :class:`~pykeyboard.button_style.ButtonStyle` to
-                   colour this button.  ``ButtonStyle.DEFAULT``
-                   produces a standard unstyled button.
+            style: Button style (default: :attr:`ButtonStyle.DEFAULT`).
 
         Example::
 
-            from pykeyboard.button_style import ButtonStyle
             from pykeyboard.callback_data import CallbackData
 
             class Action(CallbackData, prefix="act"):
                 name: str
 
-            btn = Action(name="confirm").button("✅ Confirm", style=ButtonStyle.SUCCESS)
-            btn_cancel = Action(name="cancel").button("❌ Cancel", style=ButtonStyle.DANGER)
+            btn = Action(name="confirm").button("✅ Confirm")
+            btn_cancel = Action(name="cancel").button("❌ Cancel")
         """
         from pykeyboard.keyboard_base import InlineButton
         return InlineButton(

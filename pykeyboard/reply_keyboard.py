@@ -14,9 +14,9 @@ from pyrogram.types import (ForceReply, KeyboardButton, KeyboardButtonPollType,
                             KeyboardButtonRequestChat,
                             KeyboardButtonRequestUsers, ReplyKeyboardMarkup,
                             ReplyKeyboardRemove, WebAppInfo)
+from pyrogram.enums import ButtonStyle
 
 from .keyboard_base import Button, KeyboardBase
-from .button_style import ButtonStyle
 
 logger = logging.getLogger("pykeyboard.reply_keyboard")
 
@@ -129,12 +129,14 @@ class ReplyButton(Button):
 
     Attributes:
         text: Button display text (inherited from Button).
+        icon_custom_emoji_id: Custom emoji id for the button.
         request_contact: Request user's contact information when pressed.
         request_location: Request user's location when pressed.
         request_poll: Request poll creation with specified type.
         request_users: Request user selection with specified criteria.
         request_chat: Request chat selection with specified criteria.
         web_app: Web app to open when button is pressed.
+        style: Style of the button.
 
     Note:
         Only one request_* field should be set per button for optimal UX.
@@ -205,6 +207,9 @@ class ReplyButton(Button):
                 )
 
         super().__init__(**kwargs)
+    icon_custom_emoji_id: Optional[str] = Field(
+        None, description="Custom emoji id for the button"
+    )
 
     request_contact: Optional[bool] = Field(
         None, description="Request contact information"
@@ -243,6 +248,7 @@ class ReplyButton(Button):
         """
         return KeyboardButton(
             text=self.text,
+            icon_custom_emoji_id=self.icon_custom_emoji_id,
             request_contact=self.request_contact,
             request_location=self.request_location,
             request_poll=self.request_poll,

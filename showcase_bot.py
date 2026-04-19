@@ -1,10 +1,10 @@
 """showcase_bot.py — kurigram-addons v0.5.0 feature showcase.
 
 Demonstrates every improvement and new feature introduced in v0.5.0:
-  Phase 1 — Bug fixes (get_data, reset_global_pool, storage heap, ...)
-  Phase 2 — Concurrency & security (CAS, per-instance circuit breakers, ...)
-  Phase 3 — DX (MiddlewareContext, State.filter(), PoolStatistics, ...)
-  Phase 4 — New features (CallbackData, SQLiteStorage, DI, broadcast, i18n, ...)
+  - Bug fixes (get_data, reset_global_pool, storage heap, ...)
+  - Concurrency & security (CAS, per-instance circuit breakers, ...)
+  - DX (MiddlewareContext, State.filter(), PoolStatistics, ...)
+  - New features (CallbackData, SQLiteStorage, DI, broadcast, i18n, ...)
 
 Run:
     BOT_TOKEN=... API_ID=... API_HASH=... python showcase_bot.py
@@ -16,6 +16,7 @@ Optional env vars:
     LOCALE_PATH=locales    — directory containing {lang}.json translation files
 """
 
+
 from __future__ import annotations
 
 import logging
@@ -24,6 +25,7 @@ import random
 
 from pyrogram import filters
 from pyrogram.types import CallbackQuery, Message
+from pyrogram.enums import ButtonStyle
 
 # ── Unified namespace — every public symbol lives here ───────────────────────
 from kurigram_addons import (
@@ -51,12 +53,11 @@ from kurigram_addons import (
     # FloodWait
     FloodWaitHandler,
     # New in v0.5.0
-    broadcast,        # F-5: async-generator bulk sender
-    DIContainer,      # F-9: dependency injection container
-    Depends,          # F-9: explicit injection marker
-    I18nMiddleware,   # F-10: language detection + _() injection
-    use_middleware,   # F-4: per-handler scoped middleware
-    ButtonStyle
+    broadcast,        
+    DIContainer,      
+    Depends,          
+    I18nMiddleware,   
+    use_middleware,   
 )
 
 # v0.5.0 additions not yet promoted to the top-level namespace
@@ -74,7 +75,7 @@ from pyrogram_patch.middlewares.middleware_manager import MiddlewareContext
 from pyrogram_patch.middlewares.rate_limit import RateLimitMiddleware
 from pyrogram_patch.fsm.states import State, StatesGroup
 
-# SQLite — persistent FSM, zero infrastructure (F-2)
+# SQLite — persistent FSM, zero infrastructure
 try:
     from pyrogram_patch.di import DIContainer, Depends
     from pyrogram_patch.fsm.storages.sqlite_storage import SQLiteStorage
@@ -100,7 +101,7 @@ rg = random.Random()
 API_ID      = int(os.getenv("API_ID",     "12345"))
 API_HASH    = os.getenv("API_HASH",       "abcdef")
 BOT_TOKEN   = os.getenv("BOT_TOKEN",      "123:ABC")
-HEALTH_PORT = int(os.getenv("HEALTH_PORT", "0")) or 8080
+HEALTH_PORT = int(os.getenv("HEALTH_PORT", "0"))
 DB_PATH     = os.getenv("DB_PATH",        ":memory:")
 ADMIN_IDS   = {
     int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()
@@ -109,7 +110,7 @@ LOCALE_PATH = os.getenv("LOCALE_PATH", "locales")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 1. CALLBACKDATA — strongly-typed callback data (F-1)
+# 1. CALLBACKDATA — strongly-typed callback data
 #
 # Every button payload is a typed, validated object.
 # Typos and pattern changes are caught at pack() time, not silently at runtime.
@@ -138,7 +139,7 @@ class AdminAction(CallbackData, prefix="adm"):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 2. FSM STATES — StatesGroup with .filter() shorthand (DX-7)
+# 2. FSM STATES — StatesGroup with .filter() shorthand
 # ═════════════════════════════════════════════════════════════════════════════
 
 class RegistrationStates(StatesGroup):
@@ -155,7 +156,7 @@ class RegistrationStates(StatesGroup):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 3. DEPENDENCY INJECTION (F-9)
+# 3. DEPENDENCY INJECTION
 #
 # Register providers once. Handlers declare what they need by type annotation;
 # the DIContainer resolves and injects automatically — zero per-handler boilerplate.
@@ -182,7 +183,7 @@ di.register(BotConfig, get_config)
 # 4. MIDDLEWARES
 # ═════════════════════════════════════════════════════════════════════════════
 
-# ── 4a. Logging middleware — new MiddlewareContext calling convention (DX-8) ──
+# 4a. Logging middleware — new MiddlewareContext calling convention 
 #
 # Instead of positional parameter-name sniffing the dispatcher now detects the
 # MiddlewareContext annotation and passes a single structured context object.
@@ -195,7 +196,7 @@ async def logging_middleware(ctx: MiddlewareContext) -> None:
         logger.info("update  user=%-12s  id=%s", user.first_name, user.id)
 
 
-# ── 4b. Admin guard — per-handler middleware (F-4) ───────────────────────────
+# 4b. Admin guard — per-handler middleware 
 #
 # Attached with @use_middleware(require_admin) on specific handlers only.
 # Never runs globally — exactly the right scope.
@@ -213,7 +214,7 @@ async def require_admin(update: object, client: object, patch_helper: object) ->
         raise StopPropagation
 
 
-# ── 4c. i18n middleware (F-10) ────────────────────────────────────────────────
+# 4c. i18n middleware 
 #
 # Detects user language from Telegram profile; injects a _() callable into the
 # helper data under the key "_" and the detected code under "__lang__".
@@ -225,7 +226,7 @@ i18n = I18nMiddleware(
 )
 
 
-# ── 4d. Global rate limit middleware ─────────────────────────────────────────
+# 4d. Global rate limit middleware 
 #
 # Limits ALL updates (not just /rl_mid) to 5 per 60s per user when using FSM
 # storage.  Contrast with the @RateLimit decorator which is per-handler only.
@@ -243,7 +244,7 @@ router = Router()
 _known_users: set[int] = set()
 
 
-# ── /start ────────────────────────────────────────────────────────────────────
+# /start 
 
 @router.on_command("start")
 async def start_cmd(client, message: Message) -> None:
@@ -269,10 +270,12 @@ async def start_cmd(client, message: Message) -> None:
     # Collect all buttons first, then add them in one call
     buttons = []
     for label, section in sections:
-        # F-1: DemoNav.button() wraps InlineKeyboardButton — no raw strings
+        # DemoNav.button() wraps InlineKeyboardButton — no raw strings
+        # Randomly select a style for the button
+        rn = random.randint(0, 3)
         buttons.append(DemoNav(section=section).button(
             label,
-            style = ButtonStyle.PRIMARY if random.randint(0, 3) == 0 else ButtonStyle.SUCCESS if random.randint(0, 3) == 1 else ButtonStyle.DANGER if random.randint(0, 3) == 2 else ButtonStyle.DEFAULT
+            style=ButtonStyle.DEFAULT if rn == 0 else ButtonStyle.PRIMARY if rn == 1 else ButtonStyle.SUCCESS if rn == 2 else ButtonStyle.DANGER
         ))
     
     # Add all buttons at once to ensure proper row_width=2 layout
@@ -317,14 +320,14 @@ async def help_cmd(client, message: Message) -> None:
     )
 
 
-# ── F-7: on_callback_data — capture group injection ───────────────────────────
+# on_callback_data — capture group injection 
 #
 # A single handler covers ALL nav: callbacks.  The `section` kwarg is extracted
 # from the named capture group and injected by the dispatcher automatically.
 
 @router.on_callback_data(r"nav:(?P<section>\w+)")
 async def nav_handler(client, query: CallbackQuery, section: str) -> None:
-    """Unified navigation — `section` injected from regex capture group (F-7)."""
+    """Unified navigation — `section` injected from regex capture group."""
     dispatch = {
         "registration": _section_registration,
         "menu":         _section_menu,
@@ -345,23 +348,23 @@ async def nav_handler(client, query: CallbackQuery, section: str) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 6. CONVERSATION with timeout, get_data(), and ConversationState.filter() (F-3)
+# 6. CONVERSATION with timeout, get_data(), and ConversationState.filter()
 # ═════════════════════════════════════════════════════════════════════════════
 
 class Registration(Conversation):
     """Multi-step registration demonstrating v0.5.0 conversation features.
 
     New in this version:
-    - `timeout = 300`: state key auto-expires on inactivity (F-3).
+    - `timeout = 300`: state key auto-expires on inactivity.
       The FSM storage TTL is refreshed on every goto() call.
-    - `await ctx.get_data()`: correctly awaited lazy fetch (DX-3).
+    - `await ctx.get_data()`: correctly awaited lazy fetch.
       The old `await ctx.helper.data` was a broken async property that
       returned a raw coroutine object — it is now removed entirely.
     - `ConversationState.filter()`: used by register_handlers() internally,
-      replacing stringly-typed StateFilter("Registration:name") (DX-7).
+      replacing stringly-typed StateFilter("Registration:name").
     """
 
-    timeout = 300   # seconds — auto-finish if user goes quiet (F-3)
+    timeout = 300   # seconds — auto-finish if user goes quiet for 5 min
 
     name    = ConversationState(initial=True)
     age     = ConversationState()
@@ -401,7 +404,7 @@ class Registration(Conversation):
 
     @confirm.on_enter
     async def ask_confirm(self, ctx: ConversationContext) -> None:
-        # DX-3: await ctx.get_data() — lazy, cached, properly awaited.
+        # await ctx.get_data() — lazy, cached, properly awaited.
         # The old ctx.helper.data was an async property that silently returned
         # a coroutine object instead of the dict; it is gone in v0.5.0.
         data = await ctx.get_data()
@@ -431,9 +434,9 @@ async def _section_registration(client, query: CallbackQuery) -> None:
         "📝 **Conversation Demo**\n\n"
         "Send /register to start the multi-step registration flow.\n\n"
         "**v0.5.0 features shown:**\n"
-        "• `timeout = 300` — inactivity auto-finish (F-3)\n"
-        "• `await ctx.get_data()` — fixed lazy data fetch (DX-3)\n"
-        "• `.filter()` on ConversationState — no more stringly-typed filters (DX-7)"
+        "• `timeout = 300` — inactivity auto-finish\n"
+        "• `await ctx.get_data()` — fixed lazy data fetch\n"
+        "• `.filter()` on ConversationState — no more stringly-typed filters"
     )
     await query.answer()
 
@@ -485,7 +488,7 @@ async def menu_cmd(client, message: Message) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 8. CALLBACKDATA KEYBOARD + on_callback_data (F-1 + F-7)
+# 8. CALLBACKDATA KEYBOARD + on_callback_data
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_keyboard(client, query: CallbackQuery) -> None:
@@ -498,7 +501,7 @@ async def _section_keyboard(client, query: CallbackQuery) -> None:
     ]
     kb = InlineKeyboard(row_width=2)
     for label, color in colors:
-        # F-1: .button() creates an InlineKeyboardButton with a packed payload
+        # .button() creates an InlineKeyboardButton with a packed payload
         kb.add(ColorPick(color=color).button(label))
 
     await query.edit_message_text(
@@ -511,16 +514,16 @@ async def _section_keyboard(client, query: CallbackQuery) -> None:
     await query.answer()
 
 
-# F-7: named capture group `color` is injected as a handler kwarg
+# named capture group `color` is injected as a handler kwarg
 @router.on_callback_data(r"clr:(?P<color>\w+)")
 async def color_picked(client, query: CallbackQuery, color: str) -> None:
-    """Color selection — `color` injected from regex capture group (F-7)."""
+    """Color selection — `color` injected from regex capture group."""
     emoji = {"red": "🔴", "blue": "🔵", "green": "🟢", "yellow": "🟡"}.get(color, "🎨")
     await query.answer(f"{emoji} You chose {color.capitalize()}!", show_alert=True)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 9. COMMAND PARSER + per-handler middleware (DX + F-4)
+# 9. COMMAND PARSER + per-handler middleware
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_commands(client, query: CallbackQuery) -> None:
@@ -543,7 +546,7 @@ async def greet_cmd(client, message: Message) -> None:
 
 
 @router.on_command("ban")
-@use_middleware(require_admin)   # F-4: admin check scoped to this handler only
+@use_middleware(require_admin)   # admin check scoped to this handler only
 async def ban_cmd(client, message: Message) -> None:
     """Admin-only ban: /ban <user_id> <reason>  (guarded by @use_middleware)"""
     try:
@@ -586,17 +589,17 @@ async def rl_mid_cmd(client, message: Message) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 11. PAGINATION  (F-7 — positional capture group)
+# 11. PAGINATION  (positional capture group)
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_pagination(client, query: CallbackQuery) -> None:
     await _render_page(query, page=1)
 
 
-# F-7: positional capture group — injected as group_1 (page number)
+# positional capture group — injected as group_1 (page number)
 @router.on_callback_data(r"pg:(\d+):\d+")
 async def page_handler(client, query: CallbackQuery, group_1: str) -> None:
-    """Page navigation — page number in group_1 (positional capture, F-7)."""
+    """Page navigation — page number in group_1 (positional capture)."""
     await _render_page(query, page=int(group_1))
 
 
@@ -618,7 +621,7 @@ async def _render_page(query: CallbackQuery, page: int) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 12. BROADCAST — async-generator bulk sender with FloodWait handling (F-5)
+# 12. BROADCAST — async-generator bulk sender with FloodWait handling
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_broadcast(client, query: CallbackQuery) -> None:
@@ -636,7 +639,7 @@ async def _section_broadcast(client, query: CallbackQuery) -> None:
 
 
 @router.on_command("bcast")
-@use_middleware(require_admin)   # F-4: admin guard scoped to this handler
+@use_middleware(require_admin)   # admin guard scoped to this handler
 async def bcast_cmd(client, message: Message) -> None:
     """Broadcast a message to all known users: /bcast <text>"""
     parts = message.text.split(None, 1)
@@ -654,7 +657,7 @@ async def bcast_cmd(client, message: Message) -> None:
     status = await message.reply(f"📣 Broadcasting to {len(_known_users)} users…")
     ok = fail = skip = 0
 
-    # F-5: iterate the async generator to drive sends and collect results
+    # iterate the async generator to drive sends and collect results
     async for result in broadcast(
         client,
         list(_known_users),
@@ -679,7 +682,7 @@ async def bcast_cmd(client, message: Message) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 13. FSM STATE HISTORY (F-6)
+# 13. FSM STATE HISTORY 
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_history(client, query: CallbackQuery) -> None:
@@ -717,7 +720,7 @@ async def history_cmd(client, message: Message, patch_helper) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 14. POOL STATISTICS — PoolStatistics typed dataclass (DX-6)
+# 14. POOL STATISTICS — PoolStatistics typed dataclass
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_stats(client, query: CallbackQuery) -> None:
@@ -726,7 +729,7 @@ async def _section_stats(client, query: CallbackQuery) -> None:
     # s is a frozen PoolStatistics dataclass — IDE-autocompleted fields,
     # not a raw dict. `s.active_helpers` not `s["active_helpers"]`.
     await query.edit_message_text(
-        "📊 **Live Pool Statistics** _(PoolStatistics dataclass, DX-6)_\n\n"
+        "📊 **Live Pool Statistics** _(PoolStatistics dataclass)_\n\n"
         f"Active helpers:         `{s.active_helpers}`\n"
         f"Total helpers created:  `{s.total_helpers_created}`\n"
         f"Expired helpers:        `{s.expired_helpers}`\n"
@@ -753,7 +756,7 @@ async def stats_cmd(client, message: Message) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 15. DEPENDENCY INJECTION (F-9)
+# 15. DEPENDENCY INJECTION 
 # ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_whoami(client, query: CallbackQuery) -> None:
@@ -767,7 +770,7 @@ async def _section_whoami(client, query: CallbackQuery) -> None:
 
 @router.on_command("whoami")
 async def whoami_cmd(client, message: Message, cfg=Depends(get_config)) -> None:
-    """BotConfig injected automatically by the DIContainer (F-9).
+    """BotConfig injected automatically by the DIContainer.
 
     The dispatcher detects `cfg: BotConfig`, looks up the registered
     provider (`get_config`), calls it, and passes the result as a kwarg.
@@ -784,12 +787,12 @@ async def whoami_cmd(client, message: Message, cfg=Depends(get_config)) -> None:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 16. I18N — language detection + _() injection (F-10)
+# 16. I18N — language detection + _() injection 
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.on_command("hello")
 async def hello_cmd(client, message: Message, patch_helper) -> None:
-    """Greet in the user's detected language (F-10).
+    """Greet in the user's detected language .
 
     `I18nMiddleware` (registered on startup) injects two keys into the helper:
     - `"_"` : a translation callable, e.g. `_("greeting")` → "Hello!"
@@ -829,7 +832,7 @@ async def reply_kb_cmd(client, message: Message) -> None:
 # 18. CLIENT SETUP
 # ═════════════════════════════════════════════════════════════════════════════
 
-# F-2: SQLiteStorage — persistent FSM with zero infrastructure
+# SQLiteStorage — persistent FSM with zero infrastructure
 # Falls back to MemoryStorage when aiosqlite is not installed.
 if _SQLITE_AVAILABLE and DB_PATH != ":memory:":
     storage = SQLiteStorage(DB_PATH)
@@ -844,12 +847,12 @@ app = KurigramClient(
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
     in_memory=True,
-    # DX-2: storage is auto-started (await storage.start()) and
+    # storage is auto-started (await storage.start()) and
     # auto-stopped (await storage.stop()) by KurigramClient — no manual calls needed.
     storage=storage,
     auto_flood_wait=True,
     max_flood_wait=60,
-    # F-8: optional HTTP health endpoint for container orchestration.
+    # optional HTTP health endpoint for container orchestration.
     # GET /health returns pool stats and storage health as JSON.
     # Useful for Kubernetes liveness probes and Docker HEALTHCHECK.
     health_port=HEALTH_PORT,
@@ -875,13 +878,13 @@ async def register_middlewares() -> None:
     """Register global middlewares after the pool is ready."""
     pool = app._pool
 
-    # DX-8: logging_middleware uses the new MiddlewareContext single-arg API
+    # logging_middleware uses the new MiddlewareContext single-arg API
     await pool.add_middleware(logging_middleware, kind="before", priority=50)
 
-    # F-10: i18n — detects user language, injects _() callable into helper
+    # i18n — detects user language, injects _() callable into helper
     await pool.add_middleware(i18n, kind="before", priority=40)
 
-    # Rewritten rate limit middleware — uses storage.increment() (DX-10)
+    # Rewritten rate limit middleware — uses storage.increment()
     # Limits every update to 5 per 60s per user when FSM storage is configured
     await pool.add_middleware(_global_rl, kind="before", priority=10)
 
@@ -900,8 +903,8 @@ async def on_stop() -> None:
 # Router — all handlers defined above
 app.include_router(router)
 
-# Conversation — Registration with 5-min timeout (F-3)
-# register_handlers() internally uses ConversationState.filter() (DX-7)
+# Conversation — Registration with 5-min timeout
+# register_handlers() internally uses ConversationState.filter()
 app.include_conversation(Registration)
 
 # Menus — declarative with auto back-navigation
