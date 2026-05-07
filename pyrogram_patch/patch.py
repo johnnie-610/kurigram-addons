@@ -217,7 +217,7 @@ async def patch(app: Client) -> PatchManager:
     warnings.warn(
         "patch() is deprecated and will be removed in the next major version. "
         "Use KurigramClient instead: "
-        "https://github.com/johnnie/kurigram-addons#getting-started",
+        "https://johnnie-610.github.io/kurigram-addons/getting-started",
         DeprecationWarning,
         stacklevel=2,
     )

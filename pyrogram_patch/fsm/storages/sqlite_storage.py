@@ -85,7 +85,7 @@ class SQLiteStorage(BaseStorage):
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task] = None
 
-    # ── lifecycle ────────────────────────────────────────────────────────────
+    #  lifecycle 
 
     async def start(self) -> None:
         """Open the database connection and run schema migrations."""
@@ -123,7 +123,7 @@ class SQLiteStorage(BaseStorage):
         except Exception:
             return False
 
-    # ── helpers ──────────────────────────────────────────────────────────────
+    #  helpers 
 
     def _require_db(self) -> aiosqlite.Connection:
         if self._db is None:
@@ -139,7 +139,7 @@ class SQLiteStorage(BaseStorage):
             return time.time() + ttl
         return None
 
-    # ── core API ─────────────────────────────────────────────────────────────
+    #  core API 
 
     async def set_state(
         self,
@@ -323,7 +323,7 @@ class SQLiteStorage(BaseStorage):
                 row = await cur.fetchone()
         return row["value"] if row else amount
 
-    # ── background cleanup ───────────────────────────────────────────────────
+    #  background cleanup 
 
     async def _periodic_cleanup(self) -> None:
         """Periodically delete expired rows from both tables."""

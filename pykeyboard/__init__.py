@@ -56,15 +56,6 @@ from .reply_keyboard import PyForceReply as ForceReply
 from .reply_keyboard import PyReplyKeyboardRemove as ReplyKeyboardRemove
 from .reply_keyboard import ReplyButton, ReplyKeyboard
 
-# ButtonStyle — Telegram's new inline button colour styles.
-# Gracefully absent if the raw type isn't available in this pyrogram build.
-try:
-    from .button_style import ButtonStyle
-    _button_style_available = True
-except ImportError:
-    _button_style_available = False
-    ButtonStyle = None
-
 # Builder and factory utilities
 try:
     from .builder import (KeyboardBuilder, KeyboardFactory,
@@ -134,8 +125,6 @@ __all__ = [
     "ReplyButton",
     "ReplyKeyboardRemove",
     "ForceReply",
-    # Button styling (new in v0.5.0)
-    "ButtonStyle",
     # Context Variables
     "pagination_client_context",
     # Builder Pattern

@@ -11,6 +11,8 @@ from typing import Optional, TypeVar, Union
 
 from pyrogram.filters import Filter
 
+from pyrogram import Client
+
 from pyrogram_patch.fsm.filter import (AnyStateFilter, CombinedFilter,
                                        NoStateFilter, StateFilter)
 from pyrogram_patch.router.patched_decorators.decorators import \

@@ -364,7 +364,7 @@ class Router(PatchedDecorators):
         # Standard behavior usually is just clear own handlers. 
         # But let's verify common patterns. 
         # If I include a router, it's part of the structure. 
-        # For now, let's just clear own handlers as per docstring.
+        # For now, let's just clear own handlers (as per docstring).
         # But if we want to remove subrouters, we should probably have remove_router.
         
         cleared_registered = len(self._registered_handlers)

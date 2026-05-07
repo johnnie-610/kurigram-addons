@@ -124,6 +124,6 @@ docs/.output/
 ERRORS.md
 GEMINI.md
 package.json
-
+.claude/
 # Update handlers
 update_handlers.py

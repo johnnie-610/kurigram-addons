@@ -248,7 +248,7 @@ class PatchedDispatcher(Dispatcher):
             if not await handler.check(self.client, update_to_check):
                 return False
 
-            # Run per-handler middleware chain first (F-4).
+            # Run per-handler middleware chain first.
             # These are middlewares attached directly to the handler function
             # via @use_middleware(...) — they execute before the global chain.
             from pyrogram_patch.middlewares.per_handler import run_handler_middlewares
@@ -266,7 +266,7 @@ class PatchedDispatcher(Dispatcher):
 
             kwargs = await patch_helper._get_data_for_handler(handler.callback)
 
-            # Merge DI-injected dependencies if a container is attached (F-9)
+            # Merge DI-injected dependencies if a container is attached
             di_container = getattr(self.client, "_di_container", None)
             if di_container is not None:
                 try:

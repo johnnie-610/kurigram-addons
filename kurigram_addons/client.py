@@ -393,7 +393,7 @@ class KurigramClient(Client):
 
         return result
 
-    # ── Lifecycle hook decorators ────────────────────────────────
+    #  Lifecycle hook decorators
 
     def on_startup(self, func: Callable) -> Callable:
         """Register an async function to run after the client starts.
@@ -431,7 +431,7 @@ class KurigramClient(Client):
         self._shutdown_hooks.append(func)
         return func
 
-    # ── Convenience properties ──────────────────────────────────
+    #  Convenience properties 
 
     @property
     def pool(self) -> Optional[PatchDataPool]:

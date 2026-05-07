@@ -36,7 +36,7 @@ class FSMContext:
         self._storage = storage
         self._id = identifier
 
-    # ── helpers ──────────────────────────────────────────────────
+    #  helpers 
 
     _CAS_RETRIES = 10  # max optimistic retries before raising
 
@@ -85,7 +85,7 @@ class FSMContext:
             context={"identifier": self._id},
         )
 
-    # ── state ────────────────────────────────────────────────────
+    #  state 
 
     async def set_state(
         self,
@@ -139,7 +139,7 @@ class FSMContext:
         """Clear the FSM state and data."""
         return await self._storage.delete_state(self._id)
 
-    # ── data ─────────────────────────────────────────────────────
+    #  data 
 
     async def update_data(self, **kwargs: Any) -> Dict[str, Any]:
         """Merge *kwargs* into the FSM data dict and return the new dict.
@@ -176,13 +176,13 @@ class FSMContext:
 
         await self._cas_update(_clear)
 
-    # ── combined ─────────────────────────────────────────────────
+    #  combined 
 
     async def get_state_and_data(self) -> Optional[Dict[str, Any]]:
         """Return the full FSM state dict, or None if absent."""
         return await self._storage.get_state(self._id)
 
-    # ── history ──────────────────────────────────────────────────
+    #  history 
 
     _HISTORY_KEY_SUFFIX = "__history__"
     _HISTORY_MAX = 50  # hard cap to prevent unbounded growth

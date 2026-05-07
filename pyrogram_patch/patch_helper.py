@@ -403,7 +403,7 @@ class PatchHelper:
     async def update_data(self, **kwargs: Any) -> Dict[str, Any]:
         """Merge *kwargs* into the helper's data dict and return the new dict.
 
-        Order of operations (R-3 fix):
+        Order of operations:
         1. Write to FSM storage first (durable, CAS-safe via FSMContext).
         2. Only update the in-memory dict after the storage write succeeds.
 

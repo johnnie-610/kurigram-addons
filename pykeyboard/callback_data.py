@@ -32,6 +32,10 @@ Example::
     # Optional field-level filtering
     @router.on_callback_query(Page.filter(num=3))
     async def only_page_3(client, query): ...
+
+Note:
+    CallbackData subclasses may be limited in some functionality, Please use other methods if needed.
+
 """
 
 from __future__ import annotations

@@ -87,7 +87,7 @@ class I18nMiddleware:
         # Pre-load the default language
         self._cache[default_lang] = self._load_lang(default_lang)
 
-    # ── Language loading ─────────────────────────────────────────────────────
+    #  Language loading 
 
     def _load_lang(self, lang: str) -> Callable[[str], str]:
         """Return a translation callable for *lang*, falling back to default."""
@@ -134,7 +134,7 @@ class I18nMiddleware:
             self._cache[lang] = self._load_lang(lang)
         return self._cache[lang]
 
-    # ── Middleware callable ──────────────────────────────────────────────────
+    # Middleware callable 
 
     async def __call__(
         self,

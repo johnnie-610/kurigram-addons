@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import warnings
 from typing import Any, Dict, Optional
+from pyrogram_patch.fsm.filter import StateFilter
 
 logger = logging.getLogger("pyrogram_patch.fsm.states")
 
