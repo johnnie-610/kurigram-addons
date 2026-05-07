@@ -159,8 +159,11 @@ class I18nMiddleware:
         if user is not None:
             lang = getattr(user, "language_code", None)
             if lang:
-                # Normalise "en-US" -> "en"
-                return lang.split("-")[0].lower()
+                # Normalise "en-US" -> "en", then sanitise to alphanumeric +
+                # underscore only to prevent path traversal in _load_json.
+                code = lang.split("-")[0].lower()
+                if code.isalpha() and 2 <= len(code) <= 8:
+                    return code
 
         return "en"
 

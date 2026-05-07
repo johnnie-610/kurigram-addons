@@ -36,9 +36,10 @@ from kurigram_addons.conversation import Conversation, ConversationContext, Conv
 # Menu system
 from kurigram_addons.menu import Menu, MenuButton
 
-# Keyboards (from pykeyboard)
 # Keyboards (from pykeyboard) — wrapped so a pyrogram version mismatch in
 # pykeyboard does not prevent the rest of kurigram_addons from loading.
+_pykeyboard_exports: list = []
+
 try:
     from pykeyboard import (
         Button,
@@ -50,11 +51,14 @@ try:
         ReplyKeyboardRemove,
         pagination_client_context,
     )
-    pykeyboard_available = True
+    _pykeyboard_exports += [
+        "Button", "ForceReply", "InlineButton", "InlineKeyboard",
+        "ReplyButton", "ReplyKeyboard", "ReplyKeyboardRemove",
+        "pagination_client_context",
+    ]
 except (ImportError, Exception):
-    pykeyboard_available = False
+    pass
 
-# Builder & Factory (optional deps)
 try:
     from pykeyboard import (
         KeyboardBuilder,
@@ -62,6 +66,70 @@ try:
         build_inline_keyboard,
         build_reply_keyboard,
     )
+    _pykeyboard_exports += [
+        "KeyboardBuilder", "KeyboardFactory",
+        "build_inline_keyboard", "build_reply_keyboard",
+    ]
+except (ImportError, Exception):
+    pass
+
+try:
+    from pykeyboard.callback_data import CallbackData
+    _pykeyboard_exports.append("CallbackData")
+except ImportError:
+    pass
+
+try:
+    from pykeyboard.button_style import ButtonStyle
+    _pykeyboard_exports.append("ButtonStyle")
+except ImportError:
+    pass
+
+try:
+    from pykeyboard import (
+        ButtonValidator,
+        KeyboardHookManager,
+        add_keyboard_hook,
+        add_validation_rule,
+        default_hook_manager,
+        default_validator,
+        validate_button,
+        validate_keyboard,
+    )
+    _pykeyboard_exports += [
+        "ButtonValidator", "KeyboardHookManager",
+        "add_keyboard_hook", "add_validation_rule",
+        "default_hook_manager", "default_validator",
+        "validate_button", "validate_keyboard",
+    ]
+except (ImportError, Exception):
+    pass
+
+try:
+    from pykeyboard import (
+        create_keyboard_from_config,
+        get_keyboard_info,
+        validate_keyboard_config,
+    )
+    _pykeyboard_exports += [
+        "create_keyboard_from_config", "get_keyboard_info",
+        "validate_keyboard_config",
+    ]
+except (ImportError, Exception):
+    pass
+
+try:
+    from pykeyboard import (
+        PyKeyboardError,
+        PaginationError,
+        PaginationUnchangedError,
+        LocaleError,
+        ConfigurationError,
+    )
+    _pykeyboard_exports += [
+        "PyKeyboardError", "PaginationError", "PaginationUnchangedError",
+        "LocaleError", "ConfigurationError",
+    ]
 except (ImportError, Exception):
     pass
 
@@ -74,13 +142,21 @@ from pyrogram_patch.router.router import Router
 # FSM
 from pyrogram_patch.fsm.base_storage import BaseStorage
 from pyrogram_patch.fsm.storages.memory_storage import MemoryStorage
-from pyrogram_patch.fsm.states import StatesGroup
+from pyrogram_patch.fsm.states import State, StatesGroup
+
+_optional_fsm_exports: list = []
 
 try:
-    from pyrogram_patch.fsm.redis_storage import RedisStorage
+    from pyrogram_patch.fsm.storages.redis_storage import RedisStorage
+    _optional_fsm_exports.append("RedisStorage")
 except ImportError:
     pass
 
+try:
+    from pyrogram_patch.fsm.storages.sqlite_storage import SQLiteStorage
+    _optional_fsm_exports.append("SQLiteStorage")
+except ImportError:
+    pass
 
 # Errors
 from pyrogram_patch.errors import (
@@ -95,13 +171,17 @@ from pyrogram_patch.errors import (
     ValidationError,
 )
 
-# Phase 3: DX Improvements
+# Middleware extras
+from pyrogram_patch.middlewares.middleware_manager import MiddlewareContext
+from pyrogram_patch.middlewares.rate_limit import RateLimitMiddleware
+
+# DX Improvements
 from kurigram_addons.command_parser import CommandParseError, parse_command
 from kurigram_addons.depends import Depends as _LegacyDepends, resolve_dependencies
 from kurigram_addons.flood_wait import FloodWaitHandler
 from kurigram_addons.rate_limit import RateLimit
 
-# Phase 4: New features
+# New features
 from kurigram_addons.broadcast import BroadcastResult, broadcast
 from kurigram_addons.i18n import I18nMiddleware
 from kurigram_addons.testing import (
@@ -113,18 +193,6 @@ from kurigram_addons.testing import (
 )
 from pyrogram_patch.di import Depends, DIContainer
 from pyrogram_patch.middlewares.per_handler import middleware, use_middleware
-from pyrogram_patch.fsm.states import State
-
-try:
-    from pykeyboard.callback_data import CallbackData
-    from pykeyboard.button_style import ButtonStyle
-except ImportError:
-    pass
-
-try:
-    from pyrogram_patch.fsm.storages.sqlite_storage import SQLiteStorage
-except ImportError:
-    pass
 
 # Version
 __version__ = "0.5.0"
@@ -139,45 +207,17 @@ __all__ = [
     # Menu
     "Menu",
     "MenuButton",
-    # Legacy (deprecated but available)
+    # Legacy (deprecated but still available)
     "PatchManager",
     "patch",
-    # Keyboards (only if pykeyboard is available)
-]
-
-if pykeyboard_available:
-    __all__.extend([
-        "InlineKeyboard",
-        "InlineButton",
-        "ReplyKeyboard",
-        "ReplyButton",
-        "Button",
-        "ForceReply",
-        "ReplyKeyboardRemove",
-        "pagination_client_context",
-        "KeyboardBuilder",
-        "KeyboardFactory",
-        "build_inline_keyboard",
-        "build_reply_keyboard",
-        "CallbackData",
-        "ButtonStyle"
-    ])
-
-# Router
-__all__.append("Router")
-
-# FSM
-__all__.extend([
+    # Router
+    "Router",
+    # FSM (always available)
     "BaseStorage",
     "MemoryStorage",
-    "RedisStorage",
-    "SQLiteStorage",
     "StatesGroup",
     "State",
-])
-
-# Errors
-__all__.extend([
+    # Errors
     "PyrogramPatchError",
     "ValidationError",
     "DispatcherError",
@@ -187,18 +227,15 @@ __all__.extend([
     "FSMTransitionError",
     "MiddlewareError",
     "RouterError",
-])
-
-# DX Improvements
-__all__.extend([
+    # Middleware extras
+    "MiddlewareContext",
+    "RateLimitMiddleware",
+    # DX Improvements
     "FloodWaitHandler",
     "parse_command",
     "CommandParseError",
     "RateLimit",
-])
-
-# Phase 4: New features
-__all__.extend([
+    # New features
     "broadcast",
     "BroadcastResult",
     "I18nMiddleware",
@@ -211,4 +248,8 @@ __all__.extend([
     "make_callback_query",
     "make_user",
     "ConversationTester",
-])
+]
+
+# Optional exports (only included when the underlying module loaded successfully)
+__all__ += _pykeyboard_exports
+__all__ += _optional_fsm_exports

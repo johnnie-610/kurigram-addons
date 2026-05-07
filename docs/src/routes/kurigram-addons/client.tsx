@@ -49,7 +49,8 @@ app.run()`}
               <tr class="border-b border-white/5"><td class="py-2"><code>name</code></td><td>str</td><td>—</td><td>Session name</td></tr>
               <tr class="border-b border-white/5"><td class="py-2"><code>storage</code></td><td>BaseStorage</td><td>None</td><td>FSM storage backend</td></tr>
               <tr class="border-b border-white/5"><td class="py-2"><code>auto_flood_wait</code></td><td>bool</td><td>False</td><td>Auto-retry on FloodWait</td></tr>
-              <tr class="border-b border-white/5"><td class="py-2"><code>max_flood_wait</code></td><td>int</td><td>60</td><td>Max wait seconds</td></tr>
+              <tr class="border-b border-white/5"><td class="py-2"><code>max_flood_wait</code></td><td>int</td><td>60</td><td>Max seconds to sleep for FloodWait</td></tr>
+              <tr class="border-b border-white/5"><td class="py-2"><code>health_port</code></td><td>int | None</td><td>None</td><td>Start a health-check HTTP server on this port (see <a href="/kurigram-addons/health" class="text-amber-400 hover:underline">HealthServer</a>)</td></tr>
               <tr><td class="py-2"><code>**kwargs</code></td><td>Any</td><td>—</td><td>Forwarded to pyrogram.Client</td></tr>
             </tbody>
           </table>
@@ -79,6 +80,42 @@ app.run()`}
 
         <h3 class="text-lg font-medium mb-2 text-teal-400">on_shutdown(func) <span class="text-xs text-slate-500">v0.4.1</span></h3>
         <p class="text-slate-400 mb-4 text-sm">Decorator. Register an async callback to run before <code>stop()</code>. See <a href="/kurigram-addons/lifecycle-hooks" class="text-amber-400 hover:underline">Lifecycle Hooks</a>.</p>
+
+        <h3 class="text-lg font-medium mb-2 text-teal-400">await stats() <span class="text-xs text-slate-500">v0.5.0</span></h3>
+        <p class="text-slate-400 mb-4 text-sm">Return a typed <code>PoolStatistics</code> dataclass with IDE-autocompleted fields. Raises <code>PatchError</code> if called before <code>start()</code>.</p>
+      </section>
+
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Health Check Server <span class="text-xs font-normal text-slate-500">v0.5.0</span></h2>
+        <p class="text-slate-400 text-sm mb-4">
+          Pass <code>health_port=8080</code> to start a lightweight asyncio HTTP server
+          that responds to <code>GET /health</code> with JSON pool statistics. Returns
+          <code>200 OK</code> when the bot is running, <code>503</code> otherwise.
+          Designed for Kubernetes liveness probes and Docker <code>HEALTHCHECK</code>.
+        </p>
+        <CodeBlock
+          code={`app = KurigramClient(
+    <span class="str">"bot"</span>,
+    bot_token=<span class="str">"TOKEN"</span>,
+    storage=MemoryStorage(),
+    health_port=<span class="num">8080</span>,
+)
+<span class="cmt"># curl http://localhost:8080/health → {"status": "ok", "uptime": 142.3, ...}</span>`}
+        />
+      </section>
+
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">stats() Example</h2>
+        <CodeBlock
+          code={`<span class="dec">@router.on_command</span>(<span class="str">"stats"</span>)
+<span class="kw">async def</span> <span class="fn">show_stats</span>(client, message):
+    s = <span class="kw">await</span> client.stats()
+    <span class="kw">await</span> message.reply(
+        <span class="str">f"Uptime: </span>{s.uptime:.0f}<span class="str">s\\n"</span>
+        <span class="str">f"Updates handled: </span>{s.total_updates}<span class="str">\\n"</span>
+        <span class="str">f"Active states: </span>{s.active_states}<span class="str">"</span>
+    )`}
+        />
       </section>
     </Layout>
   );

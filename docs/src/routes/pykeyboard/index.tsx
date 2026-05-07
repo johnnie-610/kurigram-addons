@@ -1,5 +1,5 @@
 import { Title } from "@solidjs/meta";
-import { A } from "@solidjs/router";
+
 import Layout from "~/components/Layout";
 import CodeBlock from "~/components/CodeBlock";
 
@@ -100,13 +100,14 @@ kb.add(
 
 function Feature(props: { title: string; href: string; desc: string }) {
   return (
-    <A
+    <a
       href={props.href}
+      target="_self"
       class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all duration-200 hover:-translate-y-0.5"
       style={{ background: "var(--color-surface)" }}
     >
       <div class="font-semibold text-sm mb-1">{props.title}</div>
       <div class="text-xs text-slate-500">{props.desc}</div>
-    </A>
+    </a>
   );
 }

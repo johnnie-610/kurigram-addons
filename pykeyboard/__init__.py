@@ -134,7 +134,7 @@ __all__ = [
     "ReplyButton",
     "ReplyKeyboardRemove",
     "ForceReply",
-    # Button styling (new in v0.5.0 — Telegram layer ≥167)
+    # Button styling (new in v0.5.0)
     "ButtonStyle",
     # Context Variables
     "pagination_client_context",

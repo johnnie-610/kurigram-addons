@@ -65,6 +65,27 @@ export default function FSMStatesPage() {
       </section>
 
       <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">
+          State.filter() <span class="text-sm font-normal text-slate-500">v0.5.0</span>
+        </h2>
+        <p class="text-sm text-slate-400 mb-4">
+          Ergonomic shorthand that returns a <code>StateFilter</code> bound to the state,
+          replacing the stringly-typed <code>StateFilter("Registration:name")</code> form.
+        </p>
+        <CodeBlock code={`<span class="cmt"># Before v0.5 — error-prone string</span>
+<span class="dec">@router.on_message</span>(StateFilter(<span class="str">"Registration:waiting_for_name"</span>))
+<span class="kw">async def</span> <span class="fn">handler</span>(...): ...
+
+<span class="cmt"># v0.5+ — typed, IDE-friendly</span>
+<span class="dec">@router.on_message</span>(Registration.waiting_for_name.filter())
+<span class="kw">async def</span> <span class="fn">handler</span>(...): ...`} />
+        <p class="text-sm text-slate-400 mt-3">
+          <code>ConversationState.filter()</code> works identically for states defined inside
+          a <code>Conversation</code> subclass.
+        </p>
+      </section>
+
+      <section class="mb-10">
         <h2 class="text-xl font-semibold mb-4 text-amber-400">Iterating States</h2>
         <CodeBlock code={`<span class="cmt"># Iterate over all states in a group</span>
 <span class="kw">for</span> state <span class="kw">in</span> Registration:

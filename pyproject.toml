@@ -10,10 +10,14 @@ keywords = ["kurigram", "addons", "pykeyboard", "pyrogram-patch"]
 
 dependencies = [
     "kurigram>=2.1.35",
-    "redis>=6.0.0",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
 ]
+
+[project.optional-dependencies]
+redis = ["redis>=6.0.0"]
+sqlite = ["aiosqlite>=0.22.1,<0.23.0"]
+all = ["redis>=6.0.0", "aiosqlite>=0.22.1,<0.23.0"]
 
 [project.urls]
 Repository = "https://github.com/johnnie-610/kurigram-addons"

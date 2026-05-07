@@ -18,6 +18,18 @@
 
 ---
 
+> **⚠️ Final release notice**
+>
+> **v0.5.0 is the last release from the original author.** The library is feature-complete
+> and all known bugs are fixed. It will not receive further updates from this repository.
+>
+> **Looking for a maintainer!** If you use this library and want to keep it alive — fix bugs,
+> support new Kurigram/Pyrogram versions, or add features — please open an issue on the
+> [issue tracker](https://github.com/johnnie-610/kurigram-addons/issues) expressing your interest.
+> Forks and community-maintained continuations are warmly encouraged under the MIT licence.
+
+---
+
 ## ✨ What's new in v0.5.0
 
 <strong><em>Please Note the dev branch is not usable at all</em></strong>
@@ -68,15 +80,40 @@ This release is the largest since v0.4.0. It fixes every known correctness bug, 
 
 ## 📦 Installation
 
+**pip**
 ```bash
 pip install kurigram-addons
 ```
 
-Optional extras:
+**Poetry**
+```bash
+poetry add kurigram-addons
+```
 
+**uv**
+```bash
+uv add kurigram-addons
+```
+
+Optional extras (Redis and/or SQLite storage backends):
+
+**pip**
 ```bash
 pip install kurigram-addons[redis]    # RedisStorage
 pip install kurigram-addons[sqlite]   # SQLiteStorage (aiosqlite)
+pip install kurigram-addons[all]      # both
+```
+
+**Poetry**
+```bash
+poetry add kurigram-addons[redis]
+poetry add kurigram-addons[sqlite]
+```
+
+**uv**
+```bash
+uv add kurigram-addons[redis]
+uv add kurigram-addons[sqlite]
 ```
 
 **Requirements:** Python 3.10+, kurigram ≥ 2.1.35 (or compatible Pyrogram fork), pydantic ≥ 2.11.
@@ -86,8 +123,7 @@ pip install kurigram-addons[sqlite]   # SQLiteStorage (aiosqlite)
 ## 🚀 Quick start
 
 ```python
-from kurigram_addons import KurigramClient, Router, MemoryStorage
-from pykeyboard.callback_data import CallbackData
+from kurigram_addons import KurigramClient, Router, MemoryStorage, CallbackData
 
 router = Router()
 
@@ -182,7 +218,7 @@ async def stats_cmd(client, message):
 Declare callback payloads as typed classes. Encoding, decoding, overflow checks, and Pyrogram filters are handled automatically.
 
 ```python
-from pykeyboard.callback_data import CallbackData
+from kurigram_addons import CallbackData
 
 class Page(CallbackData, prefix="pg"):
     num: int
@@ -354,7 +390,7 @@ storage = MemoryStorage(default_ttl=0)
 Persistent with zero infrastructure. Uses `aiosqlite` under the hood. `compare_and_set` is atomic via `BEGIN IMMEDIATE`.
 
 ```python
-from pyrogram_patch.fsm.storages.sqlite_storage import SQLiteStorage
+from kurigram_addons import KurigramClient, SQLiteStorage
 
 app = KurigramClient("my_bot", storage=SQLiteStorage("fsm.db"), ...)
 ```
@@ -365,7 +401,7 @@ For distributed or multi-process deployments. Each `RedisStorage` instance owns 
 
 ```python
 import redis.asyncio as aioredis
-from pyrogram_patch.fsm.storages.redis_storage import RedisStorage
+from kurigram_addons import RedisStorage
 
 redis = aioredis.from_url("redis://localhost")
 app = KurigramClient("my_bot", storage=RedisStorage(redis, prefix="bot"), ...)
@@ -376,7 +412,7 @@ app = KurigramClient("my_bot", storage=RedisStorage(redis, prefix="bot"), ...)
 Subclass `BaseStorage` and implement six methods. `increment()` is new in v0.5.0 — it maps to `INCRBY` on Redis, a locked integer add on MemoryStorage, and an UPSERT on SQLite.
 
 ```python
-from pyrogram_patch.fsm.base_storage import BaseStorage
+from kurigram_addons import BaseStorage
 
 class MyStorage(BaseStorage):
     async def set_state(self, identifier, state, *, ttl=None): ...
@@ -418,7 +454,7 @@ async def history_cmd(client, message, patch_helper):
 #### Global middleware
 
 ```python
-from pyrogram_patch.middlewares.middleware_manager import MiddlewareContext
+from kurigram_addons import MiddlewareContext
 
 # NEW in v0.5.0: single typed context object — no positional name sniffing
 async def audit_log(ctx: MiddlewareContext) -> None:
@@ -480,7 +516,7 @@ await app._pool.add_middleware(timing, kind="around")
 Uses `storage.increment()` — a single atomic call, no CAS loop, works correctly with all backends.
 
 ```python
-from pyrogram_patch.middlewares.rate_limit import RateLimitMiddleware
+from kurigram_addons import RateLimitMiddleware
 
 rl = RateLimitMiddleware(rate=10, period=60, scope="user", block=True)
 
@@ -658,7 +694,7 @@ async def on_limited(client, update, remaining):
 **Middleware** (global, storage-backed, atomic):
 
 ```python
-from pyrogram_patch.middlewares.rate_limit import RateLimitMiddleware
+from kurigram_addons import RateLimitMiddleware
 
 rl = RateLimitMiddleware(rate=20, period=60, scope="user")
 
@@ -691,10 +727,7 @@ async def ban(client, message):
 ### Keyboards
 
 ```python
-from kurigram_addons import InlineKeyboard, ReplyKeyboard, ReplyButton
-
-# Inline — with CallbackData buttons
-from pykeyboard.callback_data import CallbackData
+from kurigram_addons import InlineKeyboard, ReplyKeyboard, ReplyButton, CallbackData
 
 class Color(CallbackData, prefix="c"):
     name: str

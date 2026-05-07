@@ -1,7 +1,7 @@
 import { Title } from "@solidjs/meta";
 import Layout from "~/components/Layout";
 import CodeBlock from "~/components/CodeBlock";
-import { A } from "@solidjs/router";
+
 
 export default function GettingStarted() {
   return (
@@ -26,8 +26,50 @@ export default function GettingStarted() {
         />
         <p class="text-sm text-slate-400 mt-3">
           <strong>Requirements:</strong> Python ≥ 3.10, Kurigram ≥ 2.1.35.
-          Redis ≥ 6.0.0 is only needed if you use <code>RedisStorage</code> for FSM.
         </p>
+      </section>
+
+      {/* Optional Dependencies */}
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Optional Dependencies</h2>
+        <p class="text-slate-400 mb-4 text-sm">
+          Some features require extra packages. Install only what you need, or use <code>[all]</code> for everything:
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm text-left">
+            <thead class="text-amber-400 border-b border-white/10">
+              <tr><th class="py-2">Extra</th><th>Installs</th><th>Needed for</th></tr>
+            </thead>
+            <tbody class="text-slate-400">
+              <tr class="border-b border-white/5">
+                <td class="py-2"><code>[redis]</code></td>
+                <td><code>redis[hiredis]</code></td>
+                <td><code>RedisStorage</code> — distributed FSM persistence</td>
+              </tr>
+              <tr class="border-b border-white/5">
+                <td class="py-2"><code>[sqlite]</code></td>
+                <td><code>aiosqlite</code></td>
+                <td><code>SQLiteStorage</code> — local file-based persistence</td>
+              </tr>
+              <tr>
+                <td class="py-2"><code>[all]</code></td>
+                <td>All of the above</td>
+                <td>Everything</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <CodeBlock
+          title="Install with extras"
+          code={`<span class="cmt"># SQLite support</span>
+pip install kurigram-addons[sqlite]
+
+<span class="cmt"># Redis support</span>
+pip install kurigram-addons[redis]
+
+<span class="cmt"># Everything</span>
+pip install kurigram-addons[all]`}
+        />
       </section>
 
       {/* Minimal Bot */}
@@ -126,9 +168,13 @@ app.include_conversation(Registration)`}
       <section class="mb-8 reveal">
         <h2 class="text-xl font-semibold mb-4 text-amber-400">What's Next?</h2>
         <div class="grid sm:grid-cols-2 gap-3 stagger">
-          <NextStep href="/kurigram-addons/client" title="🤖 KurigramClient" desc="Full client API — middleware, routing, storage, FloodWait" />
-          <NextStep href="/kurigram-addons/lifecycle-hooks" title="🔄 Lifecycle Hooks" desc="on_startup / on_shutdown async callbacks" />
+          <NextStep href="/kurigram-addons/client" title="🤖 KurigramClient" desc="Full client API — middleware, routing, storage, FloodWait, health" />
+          <NextStep href="/kurigram-addons/depends" title="💉 Dependency Injection" desc="DIContainer + Depends() for handler DI" />
+          <NextStep href="/kurigram-addons/broadcast" title="📢 Broadcast" desc="Bulk send to user list with FloodWait handling" />
           <NextStep href="/kurigram-addons/conversation" title="💬 Conversations" desc="Class-based multi-step FSM flows" />
+          <NextStep href="/kurigram-addons/i18n" title="🌍 i18n" desc="Auto-detect language and inject translator" />
+          <NextStep href="/kurigram-addons/testing" title="🧪 Testing" desc="MockClient and factory functions for unit tests" />
+          <NextStep href="/pyrogram-patch/storage/sqlite" title="📦 SQLiteStorage" desc="Persistent FSM with zero infrastructure" />
           <NextStep href="/kurigram-addons/rate-limit" title="⏱️ Rate Limiting" desc="Per-user / per-chat token-bucket rate limiter" />
         </div>
       </section>
@@ -138,13 +184,14 @@ app.include_conversation(Registration)`}
 
 function NextStep(props: { href: string; title: string; desc: string }) {
   return (
-    <A
+    <a
       href={props.href}
+      target="_self"
       class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all duration-200 hover:-translate-y-0.5"
       style={{ background: "var(--color-surface)" }}
     >
       <div class="font-semibold text-sm mb-1">{props.title}</div>
       <div class="text-xs text-slate-500">{props.desc}</div>
-    </A>
+    </a>
   );
 }

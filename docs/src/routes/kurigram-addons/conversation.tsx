@@ -87,6 +87,77 @@ reg = Registration()
 reg.register_handlers(router)`}
         />
       </section>
+
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">
+          Inactivity Timeout <span class="text-sm font-normal text-slate-500">v0.5.0</span>
+        </h2>
+        <p class="text-slate-400 text-sm mb-4">
+          Set a class-level <code>timeout</code> (seconds). Every <code>goto()</code>
+          call passes the TTL to FSM storage so the state auto-expires if the user
+          stops responding. When the TTL fires the user returns to no-state on the
+          next interaction.
+        </p>
+        <CodeBlock
+          code={`<span class="kw">class</span> <span class="fn">Registration</span>(Conversation):
+    timeout = <span class="num">300</span>    <span class="cmt"># 5 minutes of inactivity → clear state</span>
+
+    name = ConversationState(initial=<span class="num">True</span>)
+    age  = ConversationState()`}
+        />
+      </section>
+
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">
+          get_data(model=) <span class="text-sm font-normal text-slate-500">v0.5.0</span>
+        </h2>
+        <p class="text-slate-400 text-sm mb-4">
+          Pass a Pydantic model class to <code>get_data()</code> to receive a validated
+          model instance instead of a raw dict. Gives IDE autocomplete and runtime
+          type checking at the point of use.
+        </p>
+        <CodeBlock
+          code={`<span class="imp">from</span> pydantic <span class="imp">import</span> BaseModel
+
+<span class="kw">class</span> <span class="fn">UserData</span>(BaseModel):
+    name: str
+    age: int
+
+<span class="dec">@done.on_enter</span>
+<span class="kw">async def</span> <span class="fn">show_summary</span>(self, ctx):
+    data: UserData = <span class="kw">await</span> ctx.helper.get_data(model=UserData)
+    <span class="kw">await</span> ctx.message.reply(<span class="str">f"Name: </span>{data.name}<span class="str">, Age: </span>{data.age}<span class="str">"</span>)`}
+        />
+      </section>
+
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">
+          on_callback Hook <span class="text-sm font-normal text-slate-500">v0.5.0</span>
+        </h2>
+        <p class="text-slate-400 text-sm mb-4">
+          Receive inline keyboard callback queries within a conversation state using
+          the <code>@state.on_callback</code> hook.
+        </p>
+        <CodeBlock
+          code={`<span class="kw">class</span> <span class="fn">Survey</span>(Conversation):
+    question = ConversationState(initial=<span class="num">True</span>)
+
+    <span class="dec">@question.on_enter</span>
+    <span class="kw">async def</span> <span class="fn">ask</span>(self, ctx):
+        kb = InlineKeyboard().row(
+            InlineButton(<span class="str">"Yes"</span>, callback_data=<span class="str">"yes"</span>),
+            InlineButton(<span class="str">"No"</span>,  callback_data=<span class="str">"no"</span>),
+        )
+        <span class="kw">await</span> ctx.message.reply(<span class="str">"Do you agree?"</span>, reply_markup=kb)
+
+    <span class="dec">@question.on_callback</span>
+    <span class="kw">async def</span> <span class="fn">got_answer</span>(self, ctx):
+        answer = ctx.callback_query.data
+        <span class="kw">await</span> ctx.callback_query.answer()
+        <span class="kw">await</span> self.finish(ctx)
+        <span class="kw">await</span> ctx.callback_query.message.edit_text(<span class="str">f"You chose: </span>{answer}<span class="str">"</span>)`}
+        />
+      </section>
     </Layout>
   );
 }

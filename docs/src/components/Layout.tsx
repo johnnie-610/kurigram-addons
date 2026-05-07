@@ -10,8 +10,10 @@ export default function Layout(props: { children: JSX.Element }) {
     if (e.key === "Escape") setMobileOpen(false);
   };
 
-  onMount(() => document.addEventListener("keydown", handleKeydown));
-  onCleanup(() => document.removeEventListener("keydown", handleKeydown));
+  onMount(() => {
+    document.addEventListener("keydown", handleKeydown);
+    onCleanup(() => document.removeEventListener("keydown", handleKeydown));
+  });
 
   return (
     <div class="min-h-screen flex">

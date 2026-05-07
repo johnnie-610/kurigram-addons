@@ -30,37 +30,57 @@ export default function MiddlewareOverview() {
       </section>
 
       <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">
+          MiddlewareContext <span class="text-sm font-normal text-slate-500">v0.5.0 — preferred</span>
+        </h2>
+        <p class="text-sm text-slate-400 mb-4">
+          In v0.5.0, the preferred calling convention uses a single <code>MiddlewareContext</code> object
+          instead of positional parameter name sniffing. This gives full IDE autocomplete:
+        </p>
+        <CodeBlock code={`<span class="imp">from</span> kurigram_addons <span class="imp">import</span> MiddlewareContext
+
+<span class="kw">async def</span> <span class="fn">auth_middleware</span>(ctx: MiddlewareContext):
+    user = <span class="kw">await</span> db.get_user(ctx.update.from_user.id)
+    <span class="kw">if not</span> user:
+        <span class="kw">await</span> ctx.update.reply(<span class="str">"Please register first."</span>)
+        <span class="kw">return</span>   <span class="cmt"># short-circuit — skip handler</span>
+
+<span class="kw">await</span> app.include_middleware(auth_middleware, kind=<span class="str">"before"</span>, priority=<span class="num">100</span>)`} />
+        <p class="text-xs text-slate-500 mt-3">
+          Fields: <code>ctx.update</code>, <code>ctx.client</code>, <code>ctx.helper</code> (PatchHelper).
+          The classic positional form (<code>update, client, patch_helper</code>) still works.
+        </p>
+      </section>
+
+      <section class="mb-10">
         <h2 class="text-xl font-semibold mb-4 text-amber-400">Phase Types</h2>
         <table>
           <thead><tr><th>Phase</th><th>Signature</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><code>before</code></td><td><code>async fn(update, client, patch_helper)</code></td><td>Pre-processing: logging, auth checks, rate limiting</td></tr>
-            <tr><td><code>around</code></td><td><code>fn(next_handler) → fn(update)</code></td><td>Wraps handler: timing, retry, error boundaries</td></tr>
-            <tr><td><code>after</code></td><td><code>async fn(update, client, patch_helper)</code></td><td>Post-processing: analytics, cleanup, notifications</td></tr>
+            <tr><td><code>before</code></td><td><code>async fn(ctx: MiddlewareContext)</code></td><td>Pre-processing: logging, auth checks, rate limiting</td></tr>
+            <tr><td><code>around</code></td><td><code>async fn(next_handler, update)</code></td><td>Wraps handler: timing, retry, error boundaries</td></tr>
+            <tr><td><code>after</code></td><td><code>async fn(ctx: MiddlewareContext)</code></td><td>Post-processing: analytics, cleanup, notifications</td></tr>
           </tbody>
         </table>
       </section>
 
       <section class="mb-10">
         <h2 class="text-xl font-semibold mb-4 text-amber-400">Quick Examples</h2>
-        <CodeBlock title="Before middleware — logging" code={`<span class="kw">async def</span> <span class="fn">log_updates</span>(update, client, patch_helper):
-    <span class="fn">print</span>(<span class="str">f"Received: </span>{<span class="fn">type</span>(update).__name__}<span class="str">"</span>)
+        <CodeBlock title="Before middleware — logging" code={`<span class="kw">async def</span> <span class="fn">log_updates</span>(ctx: MiddlewareContext):
+    print(<span class="str">f"Received: </span>{type(ctx.update).__name__}<span class="str">"</span>)
 
-manager = <span class="kw">await</span> patch(app)
-<span class="kw">await</span> manager.add_middleware(log_updates, kind=<span class="str">"before"</span>)`} />
+<span class="kw">await</span> app.include_middleware(log_updates, kind=<span class="str">"before"</span>)`} />
 
         <CodeBlock title="Around middleware — timing" code={`<span class="imp">import</span> time
 
-<span class="kw">def</span> <span class="fn">timing_middleware</span>(next_handler):
-    <span class="kw">async def</span> <span class="fn">wrapper</span>(update):
-        start = time.time()
-        result = <span class="kw">await</span> next_handler(update)
-        elapsed = time.time() - start
-        <span class="fn">print</span>(<span class="str">f"Handler took </span>{elapsed:.3f}<span class="str">s"</span>)
-        <span class="kw">return</span> result
-    <span class="kw">return</span> wrapper
+<span class="kw">async def</span> <span class="fn">timing_middleware</span>(next_handler, update):
+    start = time.monotonic()
+    result = <span class="kw">await</span> next_handler(update)
+    elapsed = time.monotonic() - start
+    print(<span class="str">f"Handler took </span>{elapsed:.3f}<span class="str">s"</span>)
+    <span class="kw">return</span> result
 
-<span class="kw">await</span> manager.add_middleware(timing_middleware, kind=<span class="str">"around"</span>)`} />
+<span class="kw">await</span> app.include_middleware(timing_middleware, kind=<span class="str">"around"</span>)`} />
       </section>
 
       <section class="mb-10">
@@ -70,24 +90,46 @@ manager = <span class="kw">await</span> patch(app)
           they execute in registration order.
         </p>
         <CodeBlock code={`<span class="cmt"># Priority 10 runs before priority 0</span>
-<span class="kw">await</span> manager.add_middleware(auth_check, kind=<span class="str">"before"</span>, priority=<span class="num">10</span>)
-<span class="kw">await</span> manager.add_middleware(log_updates, kind=<span class="str">"before"</span>, priority=<span class="num">0</span>)`} />
+<span class="kw">await</span> app.include_middleware(auth_check, kind=<span class="str">"before"</span>, priority=<span class="num">10</span>)
+<span class="kw">await</span> app.include_middleware(log_updates, kind=<span class="str">"before"</span>, priority=<span class="num">0</span>)`} />
       </section>
 
       <section class="mb-10">
         <h2 class="text-xl font-semibold mb-4 text-amber-400">Signature-Based DI</h2>
         <p class="text-sm text-slate-400 mb-4">
           Middleware functions receive arguments based on their parameter names.
-          The manager inspects your function signature and injects only what you need:
+          The dispatcher inspects your function signature and injects only what you need:
         </p>
-        <CodeBlock code={`<span class="cmt"># Only receives 'update' — efficient</span>
-<span class="kw">async def</span> <span class="fn">simple_logger</span>(update):
-    <span class="fn">print</span>(<span class="fn">type</span>(update).__name__)
+        <CodeBlock code={`<span class="cmt"># MiddlewareContext — preferred (v0.5+)</span>
+<span class="kw">async def</span> <span class="fn">modern_mw</span>(ctx: MiddlewareContext):
+    print(type(ctx.update).__name__)
 
-<span class="cmt"># Receives all three — full access</span>
+<span class="cmt"># Classic positional — still supported</span>
+<span class="kw">async def</span> <span class="fn">simple_logger</span>(update):
+    print(type(update).__name__)
+
+<span class="cmt"># Classic with all three — still supported</span>
 <span class="kw">async def</span> <span class="fn">full_middleware</span>(update, client, patch_helper):
     data = <span class="kw">await</span> patch_helper.get_data()
     <span class="cmt"># ...</span>`} />
+      </section>
+
+      <section class="mb-10">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">See Also</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <a href="/pyrogram-patch/middleware/writing" class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all" style={{ background: "var(--color-surface)" }}>
+            <div class="font-semibold text-sm mb-1">✍️ Writing Middleware</div>
+            <div class="text-xs text-slate-500">Before / around / after with examples and class-based</div>
+          </a>
+          <a href="/pyrogram-patch/middleware/per-handler" class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all" style={{ background: "var(--color-surface)" }}>
+            <div class="font-semibold text-sm mb-1">🎯 Per-Handler Middleware</div>
+            <div class="text-xs text-slate-500">@use_middleware() — attach guards to specific handlers</div>
+          </a>
+          <a href="/pyrogram-patch/middleware/rate-limit" class="block p-4 rounded-lg border border-white/10 hover:border-amber-500/30 transition-all" style={{ background: "var(--color-surface)" }}>
+            <div class="font-semibold text-sm mb-1">⏱️ Rate Limiting</div>
+            <div class="text-xs text-slate-500">Storage-backed token bucket via RateLimitMiddleware</div>
+          </a>
+        </div>
       </section>
     </Layout>
   );

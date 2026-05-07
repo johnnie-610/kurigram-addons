@@ -15,15 +15,33 @@ export default function KurigramAddonsOverview() {
       </div>
 
       <section class="mb-10 reveal">
-        <h2 class="text-xl font-semibold mb-4 text-amber-400">What's New in v0.4.0</h2>
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">What's New in v0.5.0</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <Feature title="Broadcast" desc="Async-generator bulk sender with FloodWait handling" href="/kurigram-addons/broadcast" />
+          <Feature title="DIContainer + Depends" desc="FastAPI-style dependency injection for handlers" href="/kurigram-addons/depends" />
+          <Feature title="I18nMiddleware" desc="Auto-detect user language, inject _() translator" href="/kurigram-addons/i18n" />
+          <Feature title="HealthServer" desc="Lightweight HTTP health endpoint for K8s / Docker" href="/kurigram-addons/health" />
+          <Feature title="SQLiteStorage" desc="Persistent FSM storage with zero infrastructure" href="/pyrogram-patch/storage/sqlite" />
+          <Feature title="CallbackData Factory" desc="Strongly-typed callback data with pack/unpack/filter" href="/pykeyboard/callback-data" />
+          <Feature title="MiddlewareContext" desc="Structured single-arg middleware calling convention" href="/pyrogram-patch/middleware/writing" />
+          <Feature title="Per-Handler Middleware" desc="@use_middleware() — attach guards to specific handlers" href="/pyrogram-patch/middleware/per-handler" />
+          <Feature title="Testing Module" desc="MockClient, factory functions, ConversationTester" href="/kurigram-addons/testing" />
+          <Feature title="Router.on_callback_data()" desc="Regex capture group injection for callback queries" href="/pyrogram-patch/router" />
+          <Feature title="FSM State History" desc="push_history() / get_history() audit ring-buffer" href="/pyrogram-patch/fsm/history" />
+          <Feature title="State.filter()" desc="Ergonomic shorthand replacing stringly-typed StateFilter" href="/pyrogram-patch/fsm/states" />
+        </div>
+      </section>
+
+      <section class="mb-10 reveal">
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Carried Over from v0.4</h2>
         <div class="grid sm:grid-cols-2 gap-3">
           <Feature title="KurigramClient" desc="Drop-in Client subclass — replaces patch()" href="/kurigram-addons/client" />
           <Feature title="Conversation Handler" desc="Class-based declarative FSM flows" href="/kurigram-addons/conversation" />
           <Feature title="Menu System" desc="Declarative menus with auto back-button" href="/kurigram-addons/menu" />
-          <Feature title="Depends()" desc="FastAPI-style dependency injection" href="/kurigram-addons/depends" />
-          <Feature title="RateLimit" desc="Per-user / per-chat token bucket" href="/kurigram-addons/rate-limit" />
+          <Feature title="RateLimit" desc="Per-user / per-chat token bucket decorator" href="/kurigram-addons/rate-limit" />
           <Feature title="Command Parser" desc="Typed /command arg1 arg2 parsing" href="/kurigram-addons/command-parser" />
           <Feature title="Auto FloodWait" desc="Transparent retry with backoff" href="/kurigram-addons/flood-wait" />
+          <Feature title="Lifecycle Hooks" desc="on_startup / on_shutdown async callbacks" href="/kurigram-addons/lifecycle-hooks" />
           <Feature title="Router Shortcuts" desc="on_callback() + on_command()" href="/pyrogram-patch/router" />
         </div>
       </section>
@@ -41,41 +59,46 @@ export default function KurigramAddonsOverview() {
     <span class="cmt"># Routing</span>
     Router,
     <span class="cmt"># Keyboards</span>
-    InlineKeyboard, InlineButton, ReplyKeyboard,
-    <span class="cmt"># FSM</span>
-    MemoryStorage, StatesGroup,
-    <span class="cmt"># v0.4.0 features</span>
-    Conversation, ConversationState,
-    Menu,
-    Depends,
-    RateLimit,
-    parse_command,
-    FloodWaitHandler,
+    InlineKeyboard, InlineButton, ReplyKeyboard, CallbackData,
+    <span class="cmt"># FSM & Storage</span>
+    MemoryStorage, SQLiteStorage, StatesGroup, State,
+    <span class="cmt"># Conversations & Menus</span>
+    Conversation, ConversationState, Menu,
+    <span class="cmt"># Middleware</span>
+    MiddlewareContext, use_middleware, I18nMiddleware,
+    <span class="cmt"># Dependency Injection</span>
+    DIContainer, Depends,
+    <span class="cmt"># Utilities</span>
+    broadcast, BroadcastResult,
+    parse_command, RateLimit, FloodWaitHandler,
+    <span class="cmt"># Testing</span>
+    MockClient, make_message, make_callback_query, ConversationTester,
 )`}
         />
       </section>
 
       <section class="mb-10 reveal">
-        <h2 class="text-xl font-semibold mb-4 text-amber-400">Migration from v0.3.x</h2>
+        <h2 class="text-xl font-semibold mb-4 text-amber-400">Quick Start</h2>
         <p class="text-slate-400 mb-4 text-sm">
-          Replace <code>patch()</code> with <code>KurigramClient</code> and update your imports:
+          Replace <code>patch()</code> with <code>KurigramClient</code> and import from a single package:
         </p>
         <CodeBlock
-          title="Before (v0.3.x)"
-          code={`<span class="cmt"># Old way</span>
-<span class="imp">from</span> pyrogram <span class="imp">import</span> Client
-<span class="imp">from</span> pyrogram_patch <span class="imp">import</span> patch
-<span class="imp">from</span> pykeyboard <span class="imp">import</span> InlineKeyboard
+          title="main.py"
+          code={`<span class="imp">from</span> kurigram_addons <span class="imp">import</span> KurigramClient, Router, MemoryStorage
 
-app = Client(<span class="str">"my_bot"</span>)
-manager = <span class="kw">await</span> patch(app)`}
-        />
-        <CodeBlock
-          title="After (v0.4.0)"
-          code={`<span class="cmt"># New way</span>
-<span class="imp">from</span> kurigram_addons <span class="imp">import</span> KurigramClient, InlineKeyboard, MemoryStorage
+router = Router()
 
-app = KurigramClient(<span class="str">"my_bot"</span>, storage=MemoryStorage())
+<span class="dec">@router.on_command</span>(<span class="str">"start"</span>)
+<span class="kw">async def</span> <span class="fn">start</span>(client, message):
+    <span class="kw">await</span> message.reply(<span class="str">"Hello!"</span>)
+
+app = KurigramClient(
+    <span class="str">"my_bot"</span>,
+    bot_token=<span class="str">"..."</span>,
+    storage=MemoryStorage(),
+    auto_flood_wait=<span class="num">True</span>,
+    health_port=<span class="num">8080</span>,
+)
 app.include_router(router)
 app.run()`}
         />

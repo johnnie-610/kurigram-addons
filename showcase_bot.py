@@ -27,7 +27,7 @@ from pyrogram import filters
 from pyrogram.types import CallbackQuery, Message
 from pyrogram.enums import ButtonStyle
 
-# ── Unified namespace — every public symbol lives here ───────────────────────
+# Unified namespace — every public symbol lives here 
 from kurigram_addons import (
     # Client
     KurigramClient,
@@ -84,7 +84,7 @@ except ImportError:
     _SQLITE_AVAILABLE = False
 
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# Logging 
 # Libraries (including kurigram-addons) now correctly use NullHandler.
 # The application owns the root logger configuration.
 logging.basicConfig(
@@ -97,7 +97,7 @@ logger = logging.getLogger("showcase")
 # Setup random generator
 rg = random.Random()
 
-# ── Environment ───────────────────────────────────────────────────────────────
+# Environment 
 API_ID      = int(os.getenv("API_ID",     "12345"))
 API_HASH    = os.getenv("API_HASH",       "abcdef")
 BOT_TOKEN   = os.getenv("BOT_TOKEN",      "123:ABC")
@@ -109,12 +109,10 @@ ADMIN_IDS   = {
 LOCALE_PATH = os.getenv("LOCALE_PATH", "locales")
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 1. CALLBACKDATA — strongly-typed callback data
 #
 # Every button payload is a typed, validated object.
 # Typos and pattern changes are caught at pack() time, not silently at runtime.
-# ═════════════════════════════════════════════════════════════════════════════
 
 class DemoNav(CallbackData, prefix="nav"):
     """Top-level navigation button payload."""
@@ -138,9 +136,7 @@ class AdminAction(CallbackData, prefix="adm"):
     target_id: int
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 2. FSM STATES — StatesGroup with .filter() shorthand
-# ═════════════════════════════════════════════════════════════════════════════
 
 class RegistrationStates(StatesGroup):
     name    = State()
@@ -155,12 +151,10 @@ class RegistrationStates(StatesGroup):
 #   @router.on_message(StateFilter("RegistrationStates:name"))
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 3. DEPENDENCY INJECTION
 #
 # Register providers once. Handlers declare what they need by type annotation;
 # the DIContainer resolves and injects automatically — zero per-handler boilerplate.
-# ═════════════════════════════════════════════════════════════════════════════
 
 di = DIContainer()
 
@@ -179,9 +173,7 @@ async def get_config() -> BotConfig:
 di.register(BotConfig, get_config)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 4. MIDDLEWARES
-# ═════════════════════════════════════════════════════════════════════════════
 
 # 4a. Logging middleware — new MiddlewareContext calling convention 
 #
@@ -234,9 +226,7 @@ i18n = I18nMiddleware(
 _global_rl = RateLimitMiddleware(rate=5, period=60, scope="user", block=True)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 5. ROUTER
-# ═════════════════════════════════════════════════════════════════════════════
 
 router = Router()
 
@@ -347,9 +337,7 @@ async def nav_handler(client, query: CallbackQuery, section: str) -> None:
         await query.answer("Unknown section.", show_alert=True)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 6. CONVERSATION with timeout, get_data(), and ConversationState.filter()
-# ═════════════════════════════════════════════════════════════════════════════
 
 class Registration(Conversation):
     """Multi-step registration demonstrating v0.5.0 conversation features.
@@ -448,9 +436,7 @@ async def register_cmd(client, message: Message, patch_helper) -> None:
     await Registration().start(ctx)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 7. MENU SYSTEM (declarative with auto back-button)
-# ═════════════════════════════════════════════════════════════════════════════
 
 main_menu     = Menu("main",     text="📋 **Main Menu**\n\nChoose a section:")
 profile_menu  = Menu("profile",  text="👤 **Profile**",  parent=main_menu)
@@ -487,9 +473,7 @@ async def menu_cmd(client, message: Message) -> None:
     await message.reply(main_menu.text, reply_markup=kb)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 8. CALLBACKDATA KEYBOARD + on_callback_data
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_keyboard(client, query: CallbackQuery) -> None:
     """Build keyboard using CallbackData.button() — zero raw strings."""
@@ -522,9 +506,7 @@ async def color_picked(client, query: CallbackQuery, color: str) -> None:
     await query.answer(f"{emoji} You chose {color.capitalize()}!", show_alert=True)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 9. COMMAND PARSER + per-handler middleware
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_commands(client, query: CallbackQuery) -> None:
     await query.edit_message_text(
@@ -558,9 +540,7 @@ async def ban_cmd(client, message: Message) -> None:
         await message.reply(f"Usage: `/ban <user_id> <reason>`\n`{e}`")
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 10. RATE LIMITING — decorator AND middleware (both patterns shown)
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_ratelimit(client, query: CallbackQuery) -> None:
     await query.edit_message_text(
@@ -588,9 +568,7 @@ async def rl_mid_cmd(client, message: Message) -> None:
     await message.reply("✅ This call went through! (middleware rate limit)")
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 11. PAGINATION  (positional capture group)
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_pagination(client, query: CallbackQuery) -> None:
     await _render_page(query, page=1)
@@ -620,9 +598,7 @@ async def _render_page(query: CallbackQuery, page: int) -> None:
     await query.answer()
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 12. BROADCAST — async-generator bulk sender with FloodWait handling
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_broadcast(client, query: CallbackQuery) -> None:
     await query.edit_message_text(
@@ -681,9 +657,7 @@ async def bcast_cmd(client, message: Message) -> None:
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 13. FSM STATE HISTORY 
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_history(client, query: CallbackQuery) -> None:
     await query.edit_message_text(
@@ -719,9 +693,7 @@ async def history_cmd(client, message: Message, patch_helper) -> None:
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 14. POOL STATISTICS — PoolStatistics typed dataclass
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_stats(client, query: CallbackQuery) -> None:
     # `app` is defined below but this runs at call time, not definition time
@@ -755,9 +727,7 @@ async def stats_cmd(client, message: Message) -> None:
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 15. DEPENDENCY INJECTION 
-# ═════════════════════════════════════════════════════════════════════════════
 
 async def _section_whoami(client, query: CallbackQuery) -> None:
     await query.edit_message_text(
@@ -786,9 +756,7 @@ async def whoami_cmd(client, message: Message, cfg=Depends(get_config)) -> None:
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 16. I18N — language detection + _() injection 
-# ═════════════════════════════════════════════════════════════════════════════
 
 @router.on_command("hello")
 async def hello_cmd(client, message: Message, patch_helper) -> None:
@@ -809,9 +777,7 @@ async def hello_cmd(client, message: Message, patch_helper) -> None:
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 17. REPLY KEYBOARD
-# ═════════════════════════════════════════════════════════════════════════════
 
 @router.on_command("replykb")
 async def reply_kb_cmd(client, message: Message) -> None:
@@ -828,9 +794,7 @@ async def reply_kb_cmd(client, message: Message) -> None:
     )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 18. CLIENT SETUP
-# ═════════════════════════════════════════════════════════════════════════════
 
 # SQLiteStorage — persistent FSM with zero infrastructure
 # Falls back to MemoryStorage when aiosqlite is not installed.
@@ -860,9 +824,7 @@ app = KurigramClient(
 )
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 19. LIFECYCLE HOOKS
-# ═════════════════════════════════════════════════════════════════════════════
 
 @app.on_startup
 async def on_start() -> None:
@@ -896,9 +858,7 @@ async def on_stop() -> None:
     logger.info("Bot stopping — kurigram-addons v0.5.0")
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # 20. WIRE EVERYTHING TOGETHER
-# ═════════════════════════════════════════════════════════════════════════════
 
 # Router — all handlers defined above
 app.include_router(router)
@@ -915,9 +875,7 @@ app.include_menus(main_menu, profile_menu, settings_menu)
 di.attach(app)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
 # ENTRY POINT
-# ═════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     logger.info("Starting kurigram-addons v0.5.0 showcase…")

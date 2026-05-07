@@ -4,7 +4,7 @@ from typing import List
 
 import pytest
 
-from pykeyboard import InlineButton, InlineKeyboard, ReplyButton, ReplyKeyboard
+from kurigram_addons import InlineButton, InlineKeyboard, ReplyButton, ReplyKeyboard
 
 
 @pytest.fixture

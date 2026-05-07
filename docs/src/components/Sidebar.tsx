@@ -1,5 +1,5 @@
 import { createSignal, createEffect, JSX, For, Show } from "solid-js";
-import { A, useLocation } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
 
 /** Navigation tree data */
 interface NavItem {
@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
         children: [
           { title: "Inline Keyboard", href: "/pykeyboard/inline-keyboard" },
           { title: "Reply Keyboard", href: "/pykeyboard/reply-keyboard" },
+          { title: "CallbackData", href: "/pykeyboard/callback-data" },
           { title: "Pagination", href: "/pykeyboard/pagination" },
           { title: "Language Selection", href: "/pykeyboard/languages" },
           { title: "Builder API", href: "/pykeyboard/builder" },
@@ -36,6 +37,7 @@ const NAV: NavItem[] = [
           { title: "Router", href: "/pyrogram-patch/router" },
           { title: "States & Transitions", href: "/pyrogram-patch/fsm/states" },
           { title: "Filters", href: "/pyrogram-patch/fsm/filters" },
+          { title: "History", href: "/pyrogram-patch/fsm/history" },
           { title: "Conversation Handler", href: "/kurigram-addons/conversation" },
         ],
       },
@@ -44,6 +46,7 @@ const NAV: NavItem[] = [
         children: [
           { title: "Overview", href: "/pyrogram-patch/middleware" },
           { title: "Writing Middleware", href: "/pyrogram-patch/middleware/writing" },
+          { title: "Per-Handler Guards", href: "/pyrogram-patch/middleware/per-handler" },
           { title: "Rate Limiting (middleware)", href: "/pyrogram-patch/middleware/rate-limit" },
           { title: "FSM Injection", href: "/pyrogram-patch/middleware/fsm-inject" },
         ],
@@ -53,6 +56,7 @@ const NAV: NavItem[] = [
         children: [
           { title: "Overview", href: "/pyrogram-patch/storage" },
           { title: "Memory Storage", href: "/pyrogram-patch/storage/memory" },
+          { title: "SQLite Storage", href: "/pyrogram-patch/storage/sqlite" },
           { title: "Redis Storage", href: "/pyrogram-patch/storage/redis" },
           { title: "Custom Backends", href: "/pyrogram-patch/storage/custom" },
         ],
@@ -62,6 +66,10 @@ const NAV: NavItem[] = [
         children: [
           { title: "Menu System", href: "/kurigram-addons/menu" },
           { title: "Dependency Injection", href: "/kurigram-addons/depends" },
+          { title: "Broadcast", href: "/kurigram-addons/broadcast" },
+          { title: "i18n Middleware", href: "/kurigram-addons/i18n" },
+          { title: "Health Check", href: "/kurigram-addons/health" },
+          { title: "Testing", href: "/kurigram-addons/testing" },
           { title: "Command Parser", href: "/kurigram-addons/command-parser" },
           { title: "Rate Limiting", href: "/kurigram-addons/rate-limit" },
           { title: "Auto FloodWait", href: "/kurigram-addons/flood-wait" },
@@ -72,7 +80,7 @@ const NAV: NavItem[] = [
       { title: "Error Handling", href: "/pyrogram-patch/errors" },
     ],
   },
-  { title: "Migration from v0.3.x", href: "/migration" },
+  { title: "Migration Guide", href: "/migration" },
   {
     title: "API Reference",
     children: [
@@ -103,8 +111,9 @@ function NavLink(props: { item: NavItem; depth: number }) {
   const isActive = () => stripBase(location.pathname) === props.item.href;
 
   return (
-    <A
+    <a
       href={props.item.href!}
+      target="_self"
       class="block py-1.5 px-3 rounded-md text-sm transition-all duration-200 hover:translate-x-0.5"
       classList={{
         "text-amber-400 bg-amber-500/10 font-medium": isActive(),
@@ -113,41 +122,21 @@ function NavLink(props: { item: NavItem; depth: number }) {
       style={{ "padding-left": `${props.depth * 0.75 + 0.75}rem` }}
     >
       {props.item.title}
-    </A>
+    </a>
   );
 }
 
 function NavGroup(props: { item: NavItem; depth: number }) {
   const location = useLocation();
 
-  // Only open by default if a child is currently active
-  const childIsActive = () =>
-    props.item.children ? hasActiveChild(props.item.children, location.pathname) : false;
-
-  const [open, setOpen] = createSignal(childIsActive());
-  const [userToggled, setUserToggled] = createSignal(false);
-
-  // Reactively open when navigating TO a child, but respect user's manual close
-  createEffect(() => {
-    const active = childIsActive();
-    if (active && !open()) {
-      // A child became active — force open
-      setOpen(true);
-      setUserToggled(false);
-    }
-    // If the user explicitly closed this group and no child is active, stay closed
-  });
-
-  const toggle = () => {
-    setUserToggled(true);
-    setOpen(!open());
+  const childIsActive = () => {
+    return props.item.children ? hasActiveChild(props.item.children, location.pathname) : false;
   };
 
   return (
-    <div>
-      <button
-        onClick={toggle}
-        class="w-full flex items-center justify-between py-1.5 px-3 text-sm font-semibold transition-colors"
+    <details class="group" open={childIsActive()}>
+      <summary
+        class="w-full flex items-center justify-between py-1.5 px-3 text-sm font-semibold transition-colors cursor-pointer list-none appearance-none"
         classList={{
           "text-amber-400": childIsActive(),
           "text-slate-400 hover:text-amber-300": !childIsActive(),
@@ -156,8 +145,7 @@ function NavGroup(props: { item: NavItem; depth: number }) {
       >
         <span>{props.item.title}</span>
         <svg
-          class="w-3.5 h-3.5 transition-transform duration-200"
-          classList={{ "rotate-90": open() }}
+          class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-90"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -165,53 +153,146 @@ function NavGroup(props: { item: NavItem; depth: number }) {
         >
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
         </svg>
-      </button>
-      <Show when={open()}>
-        <div class="overflow-hidden">
-          <For each={props.item.children}>
-            {(child) =>
-              child.children ? (
-                <NavGroup item={child} depth={props.depth + 1} />
-              ) : (
-                <NavLink item={child} depth={props.depth + 1} />
-              )
-            }
-          </For>
-        </div>
-      </Show>
-    </div>
+      </summary>
+      <div class="overflow-hidden">
+        <For each={props.item.children}>
+          {(child) =>
+            child.children ? (
+              <NavGroup item={child} depth={props.depth + 1} />
+            ) : (
+              <NavLink item={child} depth={props.depth + 1} />
+            )
+          }
+        </For>
+      </div>
+    </details>
   );
 }
 
 /** Available documentation versions */
 const VERSIONS = [
-  { label: "v0.4.x (latest)", path: "/kurigram-addons/v0.4/" },
-  { label: "v0.3.x", path: "/kurigram-addons/" },
+  { label: "v0.5.0 (final)", path: "/" },
+  { label: "v0.4.x", path: "/v0.4/" },
+  { label: "v0.3.x", path: "/v0.3/" },
+];
+
+/** Navigation for v0.3.x */
+const NAV_V3: NavItem[] = [
+  { title: "Getting Started", href: "/v0.3/" },
+  {
+    title: "pykeyboard",
+    children: [
+      { title: "Inline Keyboard", href: "/v0.3/pykeyboard/" },
+      { title: "Reply Keyboard", href: "/v0.3/pykeyboard/reply-keyboard" },
+      { title: "Pagination", href: "/v0.3/pykeyboard/pagination" },
+      { title: "Builder API", href: "/v0.3/pykeyboard/builder" },
+      { title: "Hooks & Validation", href: "/v0.3/pykeyboard/hooks" },
+    ],
+  },
+  {
+    title: "pyrogram_patch",
+    children: [
+      { title: "Patching Setup", href: "/v0.3/pyrogram-patch/" },
+      { title: "Router", href: "/v0.3/pyrogram-patch/router" },
+      { title: "FSM & States", href: "/v0.3/pyrogram-patch/fsm" },
+      { title: "Storage", href: "/v0.3/pyrogram-patch/storage" },
+      { title: "Middleware", href: "/v0.3/pyrogram-patch/middleware" },
+      { title: "Circuit Breaker", href: "/v0.3/pyrogram-patch/circuit-breaker" },
+      { title: "Configuration", href: "/v0.3/pyrogram-patch/configuration" },
+    ],
+  },
+];
+
+/** Navigation for v0.4.x */
+const NAV_V4: NavItem[] = [
+  { title: "Home", href: "/v0.4/" },
+  { title: "Getting Started", href: "/v0.4/getting-started" },
+  {
+    title: "kurigram-addons",
+    children: [
+      { title: "Overview", href: "/v0.4/kurigram-addons" },
+      { title: "KurigramClient", href: "/v0.4/kurigram-addons/client" },
+      { title: "Lifecycle Hooks", href: "/v0.4/kurigram-addons/lifecycle-hooks" },
+      {
+        title: "Keyboards",
+        children: [
+          { title: "Inline Keyboard", href: "/v0.4/pykeyboard/inline-keyboard" },
+          { title: "Reply Keyboard", href: "/v0.4/pykeyboard/reply-keyboard" },
+          { title: "Pagination", href: "/v0.4/pykeyboard/pagination" },
+          { title: "Language Selection", href: "/v0.4/pykeyboard/languages" },
+          { title: "Builder API", href: "/v0.4/pykeyboard/builder" },
+          { title: "Factory Presets", href: "/v0.4/pykeyboard/factory" },
+          { title: "Validation & Hooks", href: "/v0.4/pykeyboard/hooks" },
+          { title: "Utilities", href: "/v0.4/pykeyboard/utilities" },
+        ],
+      },
+      {
+        title: "Routing & FSM",
+        children: [
+          { title: "Router", href: "/v0.4/pyrogram-patch/router" },
+          { title: "States & Transitions", href: "/v0.4/pyrogram-patch/fsm/states" },
+          { title: "Filters", href: "/v0.4/pyrogram-patch/fsm/filters" },
+          { title: "Conversation Handler", href: "/v0.4/kurigram-addons/conversation" },
+        ],
+      },
+      {
+        title: "Middleware",
+        children: [
+          { title: "Overview", href: "/v0.4/pyrogram-patch/middleware" },
+          { title: "Writing Middleware", href: "/v0.4/pyrogram-patch/middleware/writing" },
+          { title: "Rate Limiting (middleware)", href: "/v0.4/pyrogram-patch/middleware/rate-limit" },
+          { title: "FSM Injection", href: "/v0.4/pyrogram-patch/middleware/fsm-inject" },
+        ],
+      },
+      {
+        title: "Storage",
+        children: [
+          { title: "Overview", href: "/v0.4/pyrogram-patch/storage" },
+          { title: "Memory Storage", href: "/v0.4/pyrogram-patch/storage/memory" },
+          { title: "Redis Storage", href: "/v0.4/pyrogram-patch/storage/redis" },
+          { title: "Custom Backends", href: "/v0.4/pyrogram-patch/storage/custom" },
+        ],
+      },
+      {
+        title: "Utilities",
+        children: [
+          { title: "Menu System", href: "/v0.4/kurigram-addons/menu" },
+          { title: "Dependency Injection", href: "/v0.4/kurigram-addons/depends" },
+          { title: "Command Parser", href: "/v0.4/kurigram-addons/command-parser" },
+          { title: "Rate Limiting", href: "/v0.4/kurigram-addons/rate-limit" },
+          { title: "Auto FloodWait", href: "/v0.4/kurigram-addons/flood-wait" },
+          { title: "Circuit Breaker", href: "/v0.4/pyrogram-patch/circuit-breaker" },
+        ],
+      },
+      { title: "Configuration", href: "/v0.4/pyrogram-patch/configuration" },
+      { title: "Error Handling", href: "/v0.4/pyrogram-patch/errors" },
+    ],
+  },
+  { title: "Migration from v0.3.x", href: "/v0.4/migration" },
+  {
+    title: "API Reference",
+    children: [
+      { title: "PyKeyboard", href: "/v0.4/api/pykeyboard" },
+      { title: "Pyrogram Patch", href: "/v0.4/api/pyrogram-patch" },
+    ],
+  },
 ];
 
 export default function Sidebar(props: { mobile?: boolean; onClose?: () => void }) {
-  const [versionOpen, setVersionOpen] = createSignal(false);
-  
-  // Detect current version from URL
+  const location = useLocation();
+
   const currentVersion = () => {
-    if (typeof window === "undefined") return VERSIONS[0];
-    const path = window.location.pathname;
-    const match = VERSIONS.find(v => path.includes(v.path));
-    return match || VERSIONS[0];
+    const path = stripBase(location.pathname);
+    if (path.startsWith("/v0.3")) return VERSIONS[2];
+    if (path.startsWith("/v0.4")) return VERSIONS[1];
+    return VERSIONS[0];
   };
 
-  const switchVersion = (path: string) => {
-    setVersionOpen(false);
-    // If we are on localhost, we might need to strip the repo name
-    // but on GH Pages, the absolute path from root is standard.
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      // Local dev usually serves at root /
-      // Strip /kurigram-addons prefix if it exists in the target path
-      const localPath = path.replace("/kurigram-addons", "") || "/";
-      window.location.href = localPath;
-    } else {
-      window.location.href = path;
-    }
+  const currentNav = () => {
+    const path = stripBase(location.pathname);
+    if (path.startsWith("/v0.3")) return NAV_V3;
+    if (path.startsWith("/v0.4")) return NAV_V4;
+    return NAV;
   };
 
   return (
@@ -234,37 +315,30 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
 
       {/* Version selector */}
       <div class="px-3 pb-3 mb-2 border-b border-white/10 relative">
-        <button
-          onClick={() => setVersionOpen(!versionOpen())}
-          class="flex items-center gap-1.5 mt-2 px-2 py-1 rounded-md text-[0.7rem] font-mono bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors w-full justify-between"
-        >
-          <span>{currentVersion().label}</span>
-          <svg
-            class="w-3 h-3 transition-transform"
-            classList={{ "rotate-180": versionOpen() }}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+        <details class="group relative">
+          <summary
+            class="flex items-center gap-1.5 mt-2 px-2 py-1 rounded-md text-[0.7rem] font-mono bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors w-full justify-between cursor-pointer list-none appearance-none"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+            <span>{currentVersion().label}</span>
+            <svg
+              class="w-3 h-3 transition-transform group-open:rotate-180"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
 
-        <Show when={versionOpen()}>
-            <div class="absolute left-3 right-3 mt-1 rounded-lg border border-white/10 bg-[var(--bg-primary)] shadow-xl z-50 overflow-hidden">
+          <div class="absolute left-0 right-0 mt-1 rounded-lg border border-white/10 bg-[var(--bg-primary)] shadow-xl z-50 overflow-hidden">
             <For each={VERSIONS}>
               {(ver) => {
                 const isCurrent = ver.path === currentVersion().path;
-                // For local dev, link old versions to live site
-                const targetPath = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && ver.path === "/kurigram-addons/"
-                  ? `https://johnnie-610.github.io${ver.path}`
-                  : ver.path;
-
                 return (
                   <a
-                    href={targetPath}
-                    onClick={() => setVersionOpen(false)}
+                    href={ver.path}
+                    target="_self"
                     class="block w-full text-left px-3 py-1.5 text-[0.7rem] font-mono transition-colors"
                     classList={{
                       "text-amber-400 bg-amber-500/10": isCurrent,
@@ -277,10 +351,10 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
               }}
             </For>
           </div>
-        </Show>
+        </details>
       </div>
 
-      <For each={NAV}>
+      <For each={currentNav()}>
         {(item) =>
           item.children ? (
             <NavGroup item={item} depth={0} />
