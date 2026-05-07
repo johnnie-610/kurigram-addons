@@ -15,20 +15,20 @@ let
     glib
     gtk3
     libGL
-    libX11
-    libXcomposite
-    libXcursor
-    libXdamage
-    libXext
-    libXfixes
-    libXi
-    libXrandr
-    libXrender
-    libXtst
+    xorg.libX11
+    xorg.libXcomposite
+    xorg.libXcursor
+    xorg.libXdamage
+    xorg.libXext
+    xorg.libXfixes
+    xorg.libXi
+    xorg.libXrandr
+    xorg.libXrender
+    xorg.libXtst
     libdrm
     libgbm
     libuuid
-    libxcb
+    xorg.libxcb
     libxkbcommon
     mesa
     nspr
