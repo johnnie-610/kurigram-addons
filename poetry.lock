@@ -4,9 +4,10 @@
 name = "aiosqlite"
 version = "0.22.1"
 description = "asyncio bridge to the standard sqlite3 module"
-optional = false
+optional = true
 python-versions = ">=3.9"
 groups = ["main"]
+markers = "extra == \"sqlite\" or extra == \"all\""
 files = [
     {file = "aiosqlite-0.22.1-py3-none-any.whl", hash = "sha256:21c002eb13823fad740196c5a2e9d8e62f6243bd9e7e4a1f87fb5e44ecb4fceb"},
     {file = "aiosqlite-0.22.1.tar.gz", hash = "sha256:043e0bd78d32888c0a9ca90fc788b38796843360c855a7262a532813133a0650"},
@@ -35,7 +36,7 @@ description = "Timeout context manager for asyncio programs"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "python_full_version < \"3.11.3\""
+markers = "(extra == \"redis\" or extra == \"all\") and python_full_version < \"3.11.3\" or python_version == \"3.10\""
 files = [
     {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
     {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
@@ -688,9 +689,10 @@ trio = ["trio (>=0.24)"]
 name = "redis"
 version = "7.4.0"
 description = "Python client for Redis database and key-value store"
-optional = false
+optional = true
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "extra == \"redis\" or extra == \"all\""
 files = [
     {file = "redis-7.4.0-py3-none-any.whl", hash = "sha256:a9c74a5c893a5ef8455a5adb793a31bb70feb821c86eccb62eebef5a19c429ec"},
     {file = "redis-7.4.0.tar.gz", hash = "sha256:64a6ea7bf567ad43c964d2c30d82853f8df927c5c9017766c55a1d1ed95d18ad"},
@@ -808,7 +810,12 @@ files = [
 [package.dependencies]
 typing-extensions = ">=4.12.0"
 
+[extras]
+all = ["aiosqlite", "redis"]
+redis = ["redis"]
+sqlite = ["aiosqlite"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "46a207dd772d15e6883050b94aa78dd289f77fdc9ba4b477249b34e6c2b5a64d"
+content-hash = "e632797f0ef12d79bc8521f424330a2f8e145b602150a7169754dd547c7ee625"

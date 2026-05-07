@@ -18,12 +18,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (current / v0.4.x)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ── Build v0.4.x docs ────────────────────────────────────
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -31,64 +30,22 @@ jobs:
           cache: "npm"
           cache-dependency-path: docs/package-lock.json
 
-      - name: Install v0.4.x dependencies
+      - name: Install dependencies
         working-directory: ./docs
         run: npm ci
 
-      - name: Build v0.4.x docs
-        working-directory: ./docs
-        run: npm run build
-        env:
-          BASE_URL: /kurigram-addons/v0.4
-
-      - name: Stage v0.4.x output
-        run: |
-          mkdir -p _site/v0.4
-          cp -r docs/.output/public/* _site/v0.4/
-
-      # ── Build v0.3.x docs (from last v0.3.x docs commit) ─────
-      - name: Checkout v0.3.x docs source
-        run: |
-          # cf64cbc = last commit before v0.4.0 docs were added
-          # Has logo fix (f32aad3) and BASE_URL support (c5a1a4c)
-          git checkout cf64cbc -- docs/
-
-      - name: Patch v0.3.x Sidebar (version switcher + stripBase)
-        run: node scripts/patch-v03x-sidebar.js
-
-      - name: Patch v0.3.x getting-started links
-        run: |
-          sed -i 's|href="/pykeyboard"|href="/kurigram-addons/pykeyboard"|g' docs/src/routes/getting-started.tsx
-          sed -i 's|href="/pyrogram-patch"|href="/kurigram-addons/pyrogram-patch"|g' docs/src/routes/getting-started.tsx
-          sed -i 's|href="/pyrogram-patch/fsm/states"|href="/kurigram-addons/pyrogram-patch/fsm/states"|g' docs/src/routes/getting-started.tsx
-          sed -i 's|href="/pyrogram-patch/storage"|href="/kurigram-addons/pyrogram-patch/storage"|g' docs/src/routes/getting-started.tsx
-          echo "✅ Patched v0.3.x getting-started.tsx links"
-
-      - name: Install v0.3.x dependencies
-        working-directory: ./docs
-        run: npm ci
-
-      - name: Build v0.3.x docs
+      - name: Build docs
         working-directory: ./docs
         run: npm run build
         env:
           BASE_URL: /kurigram-addons
 
-      - name: Stage v0.3.x output (root level)
+      - name: Stage output
         run: |
-          # Copy v0.3.x files to site root — skip the v0.4/ directory
-          rsync -a --exclude='v0.4' docs/.output/public/ _site/
-
-      # ── Finalization ─────────────────────────────────────────
-      - name: Add .nojekyll
-        run: touch _site/.nojekyll
-
-      - name: SPA fallback for v0.4.x
-        run: cp _site/v0.4/index.html _site/v0.4/404.html || true
-
-      - name: SPA fallback for v0.3.x
-        run: |
-          [ -f _site/404.html ] || cp _site/index.html _site/404.html || true
+          mkdir -p _site
+          cp -r docs/.output/public/* _site/
+          touch _site/.nojekyll
+          cp _site/index.html _site/404.html || true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
