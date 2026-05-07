@@ -26,7 +26,7 @@ export default function Home() {
           </p>
           <div class="flex flex-wrap gap-3 justify-center">
             <a
-              href="/getting-started"
+              href={`${import.meta.env.BASE_URL}getting-started`}
               target="_self"
               class="px-6 py-2.5 rounded-lg bg-amber-500 text-black font-semibold text-sm hover:bg-amber-400 transition-all duration-200 hover:shadow-lg hover:shadow-amber-500/25 hover:-translate-y-0.5"
             >
@@ -50,49 +50,49 @@ export default function Home() {
           icon="🤖"
           title="KurigramClient"
           description="Drop-in Client subclass with built-in middleware, FSM, routing, FloodWait handling, lifecycle hooks, and HTTP health server — replaces the legacy patch() API."
-          href="/kurigram-addons/client"
+          href={`${import.meta.env.BASE_URL}kurigram-addons/client`}
         />
         <FeatureCard
           icon="⌨️"
           title="Keyboards & CallbackData"
           description="Type-safe, declarative keyboard framework with inline/reply keyboards, pagination, language selection, builder API, and strongly-typed CallbackData factory for safe callback routing."
-          href="/pykeyboard/inline-keyboard"
+          href={`${import.meta.env.BASE_URL}pykeyboard/inline-keyboard`}
         />
         <FeatureCard
           icon="💬"
           title="Conversations"
           description="Class-based multi-step conversations with declarative state definitions, auto-registered handlers, type-safe context passing, and inactivity timeouts."
-          href="/kurigram-addons/conversation"
+          href={`${import.meta.env.BASE_URL}kurigram-addons/conversation`}
         />
         <FeatureCard
           icon="🔧"
           title="Routing & FSM"
           description="Hierarchical routers with regex capture group injection, finite state machines with CAS-protected transitions, state history ring-buffer, and State.filter() shorthand."
-          href="/pyrogram-patch/router"
+          href={`${import.meta.env.BASE_URL}pyrogram-patch/router`}
         />
         <FeatureCard
           icon="📦"
           title="Storage Backends"
           description="Pluggable FSM storage — MemoryStorage for development, SQLiteStorage for zero-infra persistence, and RedisStorage with circuit breaker for production."
-          href="/pyrogram-patch/storage"
+          href={`${import.meta.env.BASE_URL}pyrogram-patch/storage`}
         />
         <FeatureCard
           icon="💉"
           title="Dependency Injection"
           description="DIContainer with FastAPI-style Depends() marker. Register providers by type — async generators, functions, values, or classes — and inject into handlers automatically."
-          href="/kurigram-addons/depends"
+          href={`${import.meta.env.BASE_URL}kurigram-addons/depends`}
         />
         <FeatureCard
           icon="📢"
           title="Broadcast"
           description="Async-generator bulk sender with automatic FloodWait absorption, per-user result streaming, and silent skip of blocked/deactivated users."
-          href="/kurigram-addons/broadcast"
+          href={`${import.meta.env.BASE_URL}kurigram-addons/broadcast`}
         />
         <FeatureCard
           icon="🌍"
           title="i18n & Testing"
           description="I18nMiddleware auto-detects user language and injects _() translator. Testing module provides MockClient, factory functions, and ConversationTester for unit testing without Telegram."
-          href="/kurigram-addons/i18n"
+          href={`${import.meta.env.BASE_URL}kurigram-addons/i18n`}
         />
       </section>
 

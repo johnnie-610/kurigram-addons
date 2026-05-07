@@ -25,7 +25,7 @@ export default function Home() {
           </p>
           <div class="flex flex-wrap gap-3 justify-center">
             <a target="_self"
-              href="/v0.4/getting-started"
+              href={`${import.meta.env.BASE_URL}v0.4/getting-started`}
               class="px-6 py-2.5 rounded-lg bg-amber-500 text-black font-semibold text-sm hover:bg-amber-400 transition-all duration-200 hover:shadow-lg hover:shadow-amber-500/25 hover:-translate-y-0.5"
             >
               Get Started
@@ -48,37 +48,37 @@ export default function Home() {
           icon="🤖"
           title="KurigramClient"
           description="Drop-in Client subclass with built-in middleware, FSM, routing, FloodWait handling, and lifecycle hooks — replaces the legacy patch() API."
-          href="/v0.4/kurigram-addons/client"
+          href={`${import.meta.env.BASE_URL}v0.4/kurigram-addons/client`}
         />
         <FeatureCard
           icon="⌨️"
           title="Keyboards"
           description="Type-safe, declarative UI keyboard framework. Inline and reply keyboards with automatic layout, pagination, language selection, and a fluent builder API."
-          href="/v0.4/pykeyboard/inline-keyboard"
+          href={`${import.meta.env.BASE_URL}v0.4/pykeyboard/inline-keyboard`}
         />
         <FeatureCard
           icon="💬"
           title="Conversations"
           description="Class-based multi-step conversations with declarative state definitions, auto-registered handlers, and type-safe context passing."
-          href="/v0.4/kurigram-addons/conversation"
+          href={`${import.meta.env.BASE_URL}v0.4/kurigram-addons/conversation`}
         />
         <FeatureCard
           icon="🔧"
           title="Routing & FSM"
           description="Hierarchical routers, finite state machines, tri-phase middleware, and circuit breaker resilience — all built into the client."
-          href="/v0.4/pyrogram-patch/router"
+          href={`${import.meta.env.BASE_URL}v0.4/pyrogram-patch/router`}
         />
         <FeatureCard
           icon="📦"
           title="Storage Backends"
           description="Pluggable FSM storage with MemoryStorage for development and RedisStorage with circuit breaker protection for production."
-          href="/v0.4/pyrogram-patch/storage"
+          href={`${import.meta.env.BASE_URL}v0.4/pyrogram-patch/storage`}
         />
         <FeatureCard
           icon="🛡️"
           title="Error Handling"
           description="Rich structured error hierarchy with TraceInfo, JSON serialization, error IDs for log correlation, and wrap decorators for automatic handling."
-          href="/v0.4/pyrogram-patch/errors"
+          href={`${import.meta.env.BASE_URL}v0.4/pyrogram-patch/errors`}
         />
       </section>
 

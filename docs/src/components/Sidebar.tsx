@@ -98,6 +98,12 @@ function stripBase(pathname: string): string {
     : pathname;
 }
 
+/** Add the Vite base URL prefix to an internal link */
+function withBase(path: string): string {
+  const base = (import.meta.env.BASE_URL || "").replace(/\/$/, "");
+  return `${base}${path}`;
+}
+
 /** Check if any child (recursively) matches the current path */
 function hasActiveChild(items: NavItem[], pathname: string): boolean {
   const p = stripBase(pathname);
@@ -112,7 +118,7 @@ function NavLink(props: { item: NavItem; depth: number }) {
 
   return (
     <a
-      href={props.item.href!}
+      href={withBase(props.item.href!)}
       target="_self"
       class="block py-1.5 px-3 rounded-md text-sm transition-all duration-200 hover:translate-x-0.5"
       classList={{
@@ -337,7 +343,7 @@ export default function Sidebar(props: { mobile?: boolean; onClose?: () => void 
                 const isCurrent = ver.path === currentVersion().path;
                 return (
                   <a
-                    href={ver.path}
+                    href={withBase(ver.path)}
                     target="_self"
                     class="block w-full text-left px-3 py-1.5 text-[0.7rem] font-mono transition-colors"
                     classList={{
