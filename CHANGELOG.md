@@ -5,7 +5,11 @@ All notable changes to **kurigram-addons** will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] — 2026-03-23
+## [0.5.0] — 2026-05-07
+
+### Added
+
+- **Modernized Documentation Site** — fully rewritten in SolidStart with SSG support, featuring a persistent sidebar, version switching (v0.3/v0.4/v0.5), and improved mobile responsiveness.
 
 ### Fixed
 
